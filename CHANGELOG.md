@@ -6,6 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.1] - 2026-09-29
+
+### Changed
+- Raise the default `maxConcurrentRequests` from 6 to 64 per client and add
+  `maxConcurrentRequestsPerHost`, defaulting to 6 per URL hostname across ports
+  and schemes. Scheduling skips saturated hosts while preserving queue order
+  among eligible requests; redirects acquire the destination host's capacity.
+
+### Fixed
+- Release native request slots on completion or timeout even when the response
+  body is unread or paused. Acknowledge body chunks when consumed to retain
+  bounded buffering without pausing completion and error delivery.
+
+---
+
 ## [0.2.0] - 2026-09-27
 
 ### Changed

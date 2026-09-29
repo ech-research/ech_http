@@ -87,7 +87,7 @@ Add `ech_http` to your application's `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  ech_http: ^0.2.0
+  ech_http: ^0.2.1
   http: ^1.6.0
 ```
 
@@ -209,7 +209,8 @@ hooks:
 | Parameter / Feature | Default | Description |
 | :--- | :--- | :--- |
 | **Protocol** | `HTTP/1.1` | HTTP/2 and HTTP/3 are not supported in this release. |
-| **Max Concurrent Requests** | `6` | Native connection queue concurrency limit per client instance. |
+| **Global Max In-Flight Requests (`maxConcurrentRequests`)** | `64` | Maximum native requests across all hosts within each client instance. |
+| **Per-Host Max In-Flight Requests (`maxConcurrentRequestsPerHost`)** | `6` | Counted by URL hostname; different schemes and ports on that hostname share capacity. |
 | **Max Response Size** | `32 MiB` | Maximum delivered body size after gzip decoding; aborts if exceeded. |
 | **Max Upload Size** | `8 MiB` | Upload streams are fully buffered into native memory before dispatching. |
 | **Request Timeout** | `30 s` | Per-destination attempt timeout (covers DNS connection, TLS handshake, ECH retries, and data streaming). |
@@ -217,6 +218,35 @@ hooks:
 | **Compression** | Automatic gzip | Dart HttpClient negotiation and header/length semantics; `autoUncompress: false` disables decoding. Other encodings pass through. |
 | **Address Failover** | Supported | Automatically fails over across `addresses` for `GET` and `HEAD` requests before receiving headers. |
 | **Redirect Security** | Enforced | Rejects HTTPS-to-HTTP downgrades. Strips `Authorization`, `Cookie`, and `Host` on cross-origin redirects. |
+
+### Concurrency scheduling
+
+```dart
+final client = EchClient(
+  maxConcurrentRequests: 64,
+  maxConcurrentRequestsPerHost: 6,
+);
+```
+
+Requests start when both global and per-host capacity are available, releasing
+both slots on completion or cancellation. The scheduler selects eligible requests
+in queue order, skipping requests to saturated hosts so other hosts can proceed.
+Queued requests hold no in-flight capacity, and ordering within each host is FIFO.
+Both settings must be positive integers and apply independently to each client.
+
+Hostnames are case-insensitive; proxy addresses, resolved IPs and ECH public names
+do not affect accounting. HTTP/HTTPS and different ports on the same hostname
+share capacity. Different hostnames remain independent even when they share an
+IP or proxy. Cross-host redirects release source capacity and acquire capacity
+for the destination URL's hostname. Queueing and resolver work are excluded from
+`timeout`, which remains a per-destination transfer timeout.
+Use `AbortableRequest` to cancel queued requests; `close()` cancels queued and
+in-flight requests.
+
+Unread or paused bodies retain the 256 KiB unacknowledged payload budget, while
+completion and error events continue to be processed. Native completion or timeout
+therefore releases the slot even before the body is consumed. Buffered body data
+and errors remain available to the response stream's eventual listener.
 
 ### Gzip behavior
 

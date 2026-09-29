@@ -12,6 +12,7 @@ void main() {
   final servers = <HttpServer>[];
   EchClient client({
     int concurrency = 6,
+    int perHost = 6,
     int limit = 1024 * 1024,
     Duration timeout = const Duration(seconds: 5),
     String? roots,
@@ -19,6 +20,7 @@ void main() {
   }) {
     final c = EchClient(
       maxConcurrentRequests: concurrency,
+      maxConcurrentRequestsPerHost: perHost,
       maxResponseBytes: limit,
       timeout: timeout,
       trustedRootsPem: roots,
@@ -173,6 +175,74 @@ void main() {
     await subscription.cancel();
     expect((await next.timeout(const Duration(seconds: 1))).body, 'next');
   });
+
+  test(
+    'an unread completed response releases its slot and keeps its body',
+    () async {
+      final server = await serve((r) async {
+        r.response.write(r.uri.path == '/first' ? 'first' : 'next');
+        await r.response.close();
+      });
+      final c = client(concurrency: 2, perHost: 1);
+      final first = await c.send(http.Request('GET', url(server, '/first')));
+      expect(
+        (await c.get(url(server)).timeout(const Duration(seconds: 2))).body,
+        'next',
+      );
+      expect(await first.stream.bytesToString(), 'first');
+    },
+  );
+
+  for (final paused in [false, true]) {
+    test(
+      'consumer timeout releases its slot without reading (paused=$paused)',
+      () async {
+        final server = await serve((r) async {
+          if (r.uri.path == '/large') {
+            r.response.add(Uint8List(900000));
+          } else {
+            r.response.write('next');
+          }
+          await r.response.close();
+        });
+        final c = client(
+          concurrency: 2,
+          perHost: 1,
+          timeout: const Duration(milliseconds: 300),
+        );
+        final first = await c.send(http.Request('GET', url(server, '/large')));
+        final errors = <Object>[];
+        final done = Completer<void>();
+        var received = 0;
+        StreamSubscription<List<int>> listen() => first.stream.listen(
+          (chunk) => received += chunk.length,
+          onError: errors.add,
+          onDone: done.complete,
+        );
+        final subscription = paused ? (listen()..pause()) : null;
+        final next = await c
+            .get(url(server))
+            .timeout(const Duration(seconds: 3));
+        expect(next.body, 'next');
+        expect(received, 0);
+        expect(errors, isEmpty);
+        if (subscription == null) {
+          listen();
+        } else {
+          subscription.resume();
+        }
+        await done.future.timeout(const Duration(seconds: 2));
+        expect(received, inInclusiveRange(1, 256 * 1024));
+        expect(errors, [
+          isA<EchException>().having(
+            (e) => e.message,
+            'consumer timeout',
+            contains('Response consumer exceeded request timeout'),
+          ),
+        ]);
+      },
+    );
+  }
 
   test('cross-origin redirect removes sensitive headers', () async {
     String? authorization, cookie;

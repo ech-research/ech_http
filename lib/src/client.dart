@@ -11,12 +11,9 @@ import 'package:http/http.dart' as http;
 import 'native.dart' as native;
 import 'types.dart';
 
-/// A package:http client with an in-process C++ TLS/HTTP backend.
-///
-/// A non-null resolver result requires successful ECH, without plaintext
-/// fallback. Null uses ordinary certificate-verified TLS. Response bodies are
-/// streamed with bounded native buffering. Upload bodies are buffered up to
-/// [maxRequestBytes]. Call [close] when the client is no longer needed.
+/// A streaming package:http client with an in-process TLS/HTTP backend.
+/// Non-null resolver results require verified ECH without plaintext fallback.
+/// Uploads are buffered up to [maxRequestBytes]. Call [close] when finished.
 final class EchClient extends http.BaseClient implements Finalizable {
   EchClient({
     this.resolver,
@@ -25,7 +22,8 @@ final class EchClient extends http.BaseClient implements Finalizable {
     this.connectTimeout = const Duration(seconds: 10),
     this.maxResponseBytes = 32 * 1024 * 1024,
     this.maxRequestBytes = 8 * 1024 * 1024,
-    this.maxConcurrentRequests = 6,
+    this.maxConcurrentRequests = 64,
+    this.maxConcurrentRequestsPerHost = 6,
     this.autoUncompress = true,
     this.trustedRootsPem,
   }) {
@@ -39,7 +37,8 @@ final class EchClient extends http.BaseClient implements Finalizable {
     }
     if (maxResponseBytes <= 0 ||
         maxRequestBytes <= 0 ||
-        maxConcurrentRequests <= 0) {
+        maxConcurrentRequests <= 0 ||
+        maxConcurrentRequestsPerHost <= 0) {
       throw ArgumentError('Limits must be positive');
     }
     if (proxy != null &&
@@ -54,6 +53,10 @@ final class EchClient extends http.BaseClient implements Finalizable {
     if (_client == nullptr) {
       throw StateError('Unable to initialize the native HTTP backend');
     }
+    _scheduler = _RequestScheduler(
+      maxConcurrentRequests,
+      maxConcurrentRequestsPerHost,
+    );
     _finalizer.attach(this, _client.cast(), detach: this);
   }
 
@@ -65,12 +68,16 @@ final class EchClient extends http.BaseClient implements Finalizable {
   /// Maximum delivered body bytes, after gzip decoding when enabled.
   final int maxResponseBytes;
   final int maxRequestBytes;
+
+  /// Maximum in-flight native requests across all hosts for this client.
   final int maxConcurrentRequests;
 
-  /// Automatically decodes responses whose Content-Encoding is gzip.
-  ///
-  /// Like dart:io HttpClient, this leaves response headers and their compressed
-  /// Content-Length unchanged. It does not disable gzip request negotiation.
+  /// Per-client limit by URL hostname, ignoring case, scheme, port and proxy.
+  /// Saturated hosts do not block requests to other hosts.
+  final int maxConcurrentRequestsPerHost;
+
+  /// Decodes gzip while preserving wire headers and Content-Length.
+  /// Disabling this does not disable gzip negotiation.
   final bool autoUncompress;
 
   /// Replaces the bundled Mozilla CA roots for this client, e.g. for private PKI.
@@ -82,10 +89,9 @@ final class EchClient extends http.BaseClient implements Finalizable {
         .cast(),
   );
   late Pointer<native.NativeClient> _client;
+  late final _RequestScheduler _scheduler;
   final Set<_Transfer> _transfers = {};
   final Set<_Operation> _operations = {};
-  final List<Completer<void>> _waiting = [];
-  int _active = 0;
   bool _closed = false;
 
   static String get backendVersion => native.nativeVersion().toDartString();
@@ -140,7 +146,6 @@ final class EchClient extends http.BaseClient implements Finalizable {
       headers['accept-encoding'] = 'gzip';
     }
     for (var redirects = 0; ; redirects++) {
-      if (_closed) throw http.ClientException('Client is closed', uri);
       operation.check();
       final route = uri.scheme == 'https' && resolver != null
           ? await operation.race(resolver!.resolve(uri))
@@ -208,72 +213,39 @@ final class EchClient extends http.BaseClient implements Finalizable {
     final addresses = route == null || route.addresses.isEmpty
         ? ['']
         : route.addresses;
-    Object? lastError;
-    for (final address in addresses) {
-      await _acquire(uri, operation);
-      if (_closed) {
-        _release();
-        throw http.ClientException('Client is closed', uri);
-      }
-      _Transfer? transfer;
+    for (var index = 0; ; index++) {
+      final slot = await _scheduler.acquire(uri, operation);
       try {
         operation.check();
-        transfer = _Transfer(
+        final transfer = _Transfer(
           this,
+          slot,
           original,
           uri,
           method,
           headers,
           body,
           route,
-          address,
+          addresses[index],
         );
         _transfers.add(transfer);
-        final activeTransfer = transfer;
-        unawaited(
-          operation.stopped.then((error) => activeTransfer.cancel(error)),
-        );
+        unawaited(operation.stopped.then(transfer.cancel));
         return await transfer.response.future;
       } catch (error) {
-        if (transfer == null) _release();
-        if (error is! EchException) rethrow;
-        if (method != 'GET' && method != 'HEAD') rethrow;
-        lastError = error;
+        slot.release();
         // Only replay GET/HEAD, and only before receiving response headers.
+        if (error is! EchException ||
+            (method != 'GET' && method != 'HEAD') ||
+            index == addresses.length - 1) {
+          rethrow;
+        }
       }
-    }
-    throw lastError ?? EchException('No usable destination', uri: uri);
-  }
-
-  Future<void> _acquire(Uri uri, _Operation operation) async {
-    if (_closed) throw http.ClientException('Client is closed', uri);
-    operation.check();
-    if (_active < maxConcurrentRequests) {
-      _active++;
-      return;
-    }
-    final ready = Completer<void>();
-    _waiting.add(ready);
-    try {
-      await operation.race(ready.future);
-    } catch (_) {
-      // If a slot was handed to us during cancellation, pass it on.
-      if (!_waiting.remove(ready) && !_closed) _release();
-      rethrow;
-    }
-  }
-
-  void _release() {
-    if (_waiting.isNotEmpty && !_closed) {
-      _waiting.removeAt(0).complete();
-    } else {
-      _active--;
     }
   }
 
   void _finished(_Transfer transfer) {
     _transfers.remove(transfer);
-    _release();
+    transfer.slot.release();
   }
 
   static void _validateUrl(Uri uri) {
@@ -292,19 +264,92 @@ final class EchClient extends http.BaseClient implements Finalizable {
   void close() {
     if (_closed) return;
     _closed = true;
+    _scheduler.close();
     for (final operation in _operations) {
       operation.cancel(http.ClientException('Client is closed'));
     }
-    for (final waiter in _waiting) {
-      waiter.completeError(http.ClientException('Client is closed'));
-    }
-    _waiting.clear();
     for (final transfer in _transfers.toList()) {
       transfer.cancel(http.ClientException('Client is closed', transfer.uri));
     }
     _finalizer.detach(this);
     native.clientDestroy(_client);
     _client = nullptr;
+  }
+}
+
+final class _RequestScheduler {
+  _RequestScheduler(this.maxConcurrent, this.maxPerHost);
+
+  final int maxConcurrent;
+  final int maxPerHost;
+  final Set<_RequestSlot> _waiting = {};
+  final Map<String, int> _activePerHost = {};
+  int _active = 0;
+  bool _closed = false;
+
+  Future<_RequestSlot> acquire(Uri uri, _Operation operation) async {
+    operation.check();
+    final slot = _RequestSlot(this, uri.host.toLowerCase());
+    _waiting.add(slot);
+    _dispatch();
+    try {
+      await operation.race(slot.ready.future);
+      return slot;
+    } catch (_) {
+      _waiting.remove(slot);
+      slot.release();
+      rethrow;
+    }
+  }
+
+  void _dispatch() {
+    if (_closed || _waiting.isEmpty || _active >= maxConcurrent) return;
+    final admitted = <_RequestSlot>[];
+    for (final slot in _waiting) {
+      if (_active >= maxConcurrent) break;
+      final hostActive = _activePerHost[slot.host] ?? 0;
+      if (hostActive >= maxPerHost) continue;
+      _active++;
+      _activePerHost[slot.host] = hostActive + 1;
+      slot.granted = true;
+      admitted.add(slot);
+    }
+    for (final slot in admitted) {
+      _waiting.remove(slot);
+      slot.ready.complete();
+    }
+  }
+
+  void _release(String host) {
+    _active--;
+    final remaining = _activePerHost[host]! - 1;
+    if (remaining == 0) {
+      _activePerHost.remove(host);
+    } else {
+      _activePerHost[host] = remaining;
+    }
+    _dispatch();
+  }
+
+  void close() {
+    _closed = true;
+    // Operations own cancellation; closing only stops admission.
+    _waiting.clear();
+  }
+}
+
+final class _RequestSlot {
+  _RequestSlot(this._scheduler, this.host);
+
+  final _RequestScheduler _scheduler;
+  final String host;
+  final Completer<void> ready = Completer();
+  bool granted = false;
+
+  void release() {
+    if (!granted) return;
+    granted = false;
+    _scheduler._release(host);
   }
 }
 
@@ -335,6 +380,7 @@ final class _Operation {
 final class _Transfer implements Finalizable {
   _Transfer(
     this.client,
+    this.slot,
     this.original,
     this.uri,
     String method,
@@ -354,12 +400,7 @@ final class _Transfer implements Finalizable {
     }
     events = ReceivePort('ech_http response');
     subscription = events.listen(_onEvent);
-    body = StreamController<List<int>>(
-      onListen: _updateDelivery,
-      onPause: _updateDelivery,
-      onResume: _updateDelivery,
-      onCancel: () => _finish(null),
-    );
+    body = StreamController<List<int>>(onCancel: () => _finish(null));
     try {
       pointer = using((arena) {
         final opts = arena<native.NativeOptions>();
@@ -416,6 +457,7 @@ final class _Transfer implements Finalizable {
   }
 
   final EchClient client;
+  final _RequestSlot slot;
   final http.BaseRequest original;
   final Uri uri;
   final Completer<EchResponse> response = Completer();
@@ -430,22 +472,13 @@ final class _Transfer implements Finalizable {
   late final ReceivePort events;
   late final StreamSubscription<Object?> subscription;
   bool done = false;
-  bool deliveryPaused = false;
 
   void cancel(Object reason) => _finish(reason);
 
-  void _updateDelivery() {
-    if (done) return;
-    // Pausing port delivery withholds acknowledgements and bounds native output.
-    final shouldPause =
-        response.isCompleted && (!body.hasListener || body.isPaused);
-    if (shouldPause == deliveryPaused) return;
-    deliveryPaused = shouldPause;
-    if (shouldPause) {
-      subscription.pause();
-    } else {
-      subscription.resume();
-    }
+  List<int> _acknowledgeBody(List<int> data) {
+    // Bound unread bodies without pausing completion or error events.
+    if (!done) native.requestAcknowledge(pointer, data.length);
+    return data;
   }
 
   void _onEvent(Object? message) {
@@ -470,7 +503,7 @@ final class _Transfer implements Finalizable {
       }
       response.complete(
         EchResponse(
-          body.stream,
+          body.stream.map(_acknowledgeBody),
           code,
           echAccepted: event[2] != 0,
           echRetries: event[3] as int,
@@ -486,10 +519,8 @@ final class _Transfer implements Finalizable {
           reasonPhrase: lines.first.split(' ').skip(2).join(' '),
         ),
       );
-      _updateDelivery();
     } else if (type == 2) {
       body.add(data);
-      native.requestAcknowledge(pointer, data.length);
     } else if (type == 3 || type == 4) {
       _finish(
         type == 4
