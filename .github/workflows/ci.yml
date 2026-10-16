@@ -102,6 +102,7 @@ jobs:
           version: 26.0.0.821
           cache: true
       - run: dart pub get
+      - run: python3 tool/test_build_ohos.py
       - run: dart test test/ohos_build_test.dart -r expanded
       - name: Cross-compile using the Flutter-OH compatibility protocol
         shell: bash
@@ -134,13 +135,16 @@ jobs:
       - name: Set up the verified Flutter-OH toolchain
         shell: bash
         run: |
+          echo "ECH_HTTP_DART=$(command -v dart)" >> "$GITHUB_ENV"
           git init "$RUNNER_TEMP/flutter-ohos"
           git -C "$RUNNER_TEMP/flutter-ohos" remote add origin https://gitcode.com/CPF-Flutter/flutter_flutter.git
           git -C "$RUNNER_TEMP/flutter-ohos" fetch --depth=1 origin 62357a93d653bf844f730bb1f4b7cc9e2139d14e
           git -C "$RUNNER_TEMP/flutter-ohos" checkout --detach FETCH_HEAD
           echo "$RUNNER_TEMP/flutter-ohos/bin" >> "$GITHUB_PATH"
           echo "CI=true" >> "$GITHUB_ENV"
-      - run: dart run tool/create_flutter_smoke.dart ohos
+      # Keep the package's hook kernel on the SDK that compiled it. The
+      # consumer below has a separate .dart_tool and uses Flutter-OH's Dart.
+      - run: '"$ECH_HTTP_DART" run tool/create_flutter_smoke.dart ohos'
       - name: Build a Flutter consumer HAP with the native assets
         working-directory: build/flutter_smoke
         run: |

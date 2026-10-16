@@ -2,13 +2,13 @@
 
 [![Dart SDK](https://img.shields.io/badge/Dart-3.10+-0175C2.svg?logo=dart)](https://dart.dev)
 [![Flutter](https://img.shields.io/badge/Flutter-3.38+-02569B.svg?logo=flutter)](https://flutter.dev)
-[![Platforms](https://img.shields.io/badge/平台支持-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Linux%20%7C%20Windows-blue.svg)](#支持平台与工具链)
+[![Platforms](https://img.shields.io/badge/平台支持-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20OHOS-blue.svg)](#支持平台与工具链)
 [![License: MIT](https://img.shields.io/badge/开源协议-MIT-yellow.svg)](LICENSE)
 [![ECH Standard](https://img.shields.io/badge/TLS%201.3-ECH%20(RFC%20Draft)-green.svg)](https://datatracker.ietf.org/doc/draft-ietf-tls-esni/)
 
 [English](README.md)
 
-本分支新增 [OpenHarmony / HarmonyOS 构建支持](doc/ohos.zh-CN.md)，
+`ech_http` 支持 [OpenHarmony / HarmonyOS 构建](doc/ohos.zh-CN.md)，
 通过 Flutter-OH Native Assets 从固定版本源码构建原生依赖，详见接入与验证说明。
 
 `ech_http` 是专为 Dart 和 Flutter 打造的企业级 HTTP 客户端，深度集成了 **TLS 密文客户端问候（Encrypted Client Hello, ECH）**、HTTP CONNECT 代理、自定义 PKI 信任根及流式数据传输功能。完全兼容官方 `package:http.Client` 接口规范。
@@ -39,6 +39,8 @@ flowchart TD
         Hook["hook/build.dart 构建钩子"] -->|"校验 SHA-256 摘要"| SDKCache["预编译 SDK 本地缓存\n(.dart_tool 或 user_defines)"]
         SDKCache -->|"仅下载当前构建目标"| PrebuiltRepo["GitHub Releases\n(Windows / Linux / Apple / Android)"]
         Hook -->|"仅就地编译 C++ 桥接代码"| CMakeNinja["CMake + Ninja"]
+        Hook -->|"OHOS：编译固定版本源码"| OhosSources["BoringSSL + curl + zlib"]
+        OhosSources --> CMakeNinja
         CMakeNinja -->|"打包原生动态库"| OutputLib["ech_http.dll / .so / .dylib"]
     end
 ```
@@ -59,7 +61,7 @@ flowchart TD
 - **原生支持认证重试（Authenticated Retry）**：当服务端返回合法的 TLS `retry_configs`（配置拒绝重试）时，客户端会自动进行最多 2 次认证重试。重试前会严格校验外层公用名（Public Name）以防篡改。
 - **物理路由与证书身份严格解耦**：自定义目标 IP 地址列表（`addresses`）仅重定向底层的 TCP Socket 物理连接或代理 CONNECT 隧道；TLS 握手中的内层 SNI、服务端证书主体身份核验以及 HTTP `Host` 请求头始终保持原始目标域名不变。
 - **严格证书校验，无旁路后门**：所有连接默认基于内置的 Mozilla CA 根证书库严格验证证书链与主机名。**库中未设置任何跳过证书验证的不安全开关**。如需使用企业私有 PKI，可通过 `trustedRootsPem` 显式替换信任根。
-- **极速构建钩子机制**：借助 Dart `hook/build.dart`，在首次构建时按需拉取对应平台的预编译 SDK，本地仅需编译轻量级的 C++ 桥接代码（冷构建仅约 15 秒），无需在本地完整编译庞大的 BoringSSL 与 libcurl。
+- **自动原生构建**：借助 Dart `hook/build.dart`，Windows、Linux、Apple 和 Android 按需拉取经过校验的预编译 SDK，本地仅编译轻量级 C++ 桥接代码（冷构建约 15 秒）。OHOS 首次构建编译固定版本的 BoringSSL、curl 和 zlib，后续增量复用产物。
 - **零外部守护进程**：直接在应用主进程内存中通过 Dart FFI 调用原生接口，避免了子进程开销、本地端口占用冲突及系统级代理注入风险。
 
 ---

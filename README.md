@@ -1,12 +1,12 @@
 # ech_http
 
-This fork adds [OpenHarmony / HarmonyOS build support](doc/ohos.zh-CN.md)
+ech_http supports [OpenHarmony / HarmonyOS builds](doc/ohos.md)
 using Flutter-OH Native Assets and pinned source builds of the native dependencies.
 See that guide for toolchain requirements and verification limits.
 
 [![Dart SDK](https://img.shields.io/badge/Dart-3.10+-0175C2.svg?logo=dart)](https://dart.dev)
 [![Flutter](https://img.shields.io/badge/Flutter-3.38+-02569B.svg?logo=flutter)](https://flutter.dev)
-[![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Linux%20%7C%20Windows-blue.svg)](#supported-platforms-and-toolchain)
+[![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20OHOS-blue.svg)](#supported-platforms-and-toolchain)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![ECH Standard](https://img.shields.io/badge/TLS%201.3-ECH%20(RFC%20Draft)-green.svg)](https://datatracker.ietf.org/doc/draft-ietf-tls-esni/)
 
@@ -40,6 +40,8 @@ flowchart TD
         Hook["hook/build.dart"] -->|"Verify SHA-256"| SDKCache["Precompiled SDK Cache\n(.dart_tool or user_defines)"]
         SDKCache -->|"Fetch Target Only"| PrebuiltRepo["GitHub Releases\n(Windows / Linux / Apple / Android)"]
         Hook -->|"Compile C++ Bridge Only"| CMakeNinja["CMake + Ninja"]
+        Hook -->|"OHOS: Build Pinned Sources"| OhosSources["BoringSSL + curl + zlib"]
+        OhosSources --> CMakeNinja
         CMakeNinja -->|"Bundle Native Library"| OutputLib["ech_http.dll / .so / .dylib"]
     end
 ```
@@ -63,7 +65,7 @@ prompt cleanup.
 - **Authenticated ECH Retries**: Supports up to 2 automated ECH retries when the server responds with a valid TLS `retry_configs` rejection. Public names are strictly validated before retrying.
 - **Separation of Destination Routing and SNI**: IP address overrides (`addresses`) redirect only the underlying TCP socket or proxy CONNECT tunnel. The TLS inner SNI, certificate identity verification, and HTTP `Host` header always correspond to the original requested hostname.
 - **Strict TLS Verification**: Every connection strictly validates the server's certificate chain and hostname against the bundled Mozilla CA root certificates. There is **no insecure mode** or certificate bypass switch. Custom PKI roots can be explicitly loaded via `trustedRootsPem`.
-- **High-Performance Build Hooks**: Build hooks (`hook/build.dart`) automatically download verified precompiled dependency SDKs for the exact target platform, compiling only the lightweight C++ bridge locally (~15 s cold build). No need to compile BoringSSL or libcurl from scratch.
+- **Automatic Native Builds**: Build hooks (`hook/build.dart`) download verified precompiled dependency SDKs for Windows, Linux, Apple, and Android, compiling only the lightweight C++ bridge locally (~15 s cold build). OHOS builds pinned BoringSSL, curl, and zlib sources on the first build and reuses them incrementally.
 - **Zero Runtime Daemons**: Communicates directly through Dart FFI within the host process memory space, avoiding child processes, socket proxy bottlenecks, and OS port conflicts.
 
 ---
@@ -77,7 +79,7 @@ prompt cleanup.
 | **macOS** | `x64`, `arm64` | macOS host, Xcode Command Line Tools, CMake, Ninja | macOS 10.15+ (x64) / 11.0+ (arm64) |
 | **iOS** | `arm64` (device), `arm64`/`x64` (simulator) | macOS host, Xcode, CMake, Ninja | iOS 13.0+ |
 | **Android** | `arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86` | Android NDK r28.2+ (or Flutter bundled NDK), CMake, Ninja | Android API level 21+ (5.0 Lollipop) |
-| **OpenHarmony / HarmonyOS** | `arm64`, `x64` | OHOS native SDK, Python 3.12+, Git, Go, CMake, Ninja; Flutter-OH Native Assets for HAPs | See [OHOS validation](doc/ohos.zh-CN.md) |
+| **OpenHarmony / HarmonyOS** | `arm64`, `x64` | OHOS native SDK, Python 3.12+, Git, Go, CMake, Ninja; Flutter-OH Native Assets for HAPs | See [OHOS validation](doc/ohos.md) |
 
 > [!NOTE]
 > Web (Browsers) is not supported. OHOS builds its pinned dependencies from source on the first build; the other platforms use prebuilt SDKs. Android binaries link against static libc++ and use 16 KiB ELF segment alignment for Android 15 compatibility.

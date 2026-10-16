@@ -24,18 +24,20 @@ def run(args):
     subprocess.run(list(map(str, args)), check=True)
 
 
-def configure(cmake, source, build, arguments):
-    # A Git dependency update changes the package root while the hook's shared
-    # build directory stays put. Preserve downloads/libraries, reset metadata.
-    cache = build / 'CMakeCache.txt'
-    prefix = 'CMAKE_HOME_DIRECTORY:INTERNAL='
-    if cache.is_file():
-        homes = [line[len(prefix):] for line in cache.read_text().splitlines()
-                 if line.startswith(prefix)]
-        if homes and Path(homes[0]).resolve() != source.resolve():
-            cache.unlink()
-            shutil.rmtree(build / 'CMakeFiles', ignore_errors=True)
+def configure(cmake, source, build, arguments, identity=None):
+    # Configure probes and object files must not survive a dependency or SDK
+    # change. Downloads live outside these generated build directories.
+    fingerprint = json.dumps({
+        'schema': 1,
+        'source': str(source.resolve()),
+        'arguments': list(map(str, arguments)),
+        'identity': identity,
+    }, sort_keys=True)
+    stamp = build / '.ech-http-config.json'
+    if build.exists() and (not stamp.is_file() or stamp.read_text() != fingerprint):
+        shutil.rmtree(build)
     run([cmake, '-S', source, '-B', build, *arguments])
+    stamp.write_text(fingerprint)
 
 
 def digest(path):
@@ -120,15 +122,21 @@ def main():
               '-DCMAKE_C_FLAGS=-Wno-unused-command-line-argument',
               '-DCMAKE_CXX_FLAGS=-Wno-unused-command-line-argument']
     manifest = json.loads((ROOT / 'lib/src/build_support/dependencies.json').read_text())
+    sdk_metadata = json.loads((sdk / 'oh-uni-package.json').read_text())
+    identity = {
+        'dependencies': {name: manifest[name] for name in ('boringssl', 'curl', 'zlib')},
+        'native_sdk': sdk_metadata,
+        'toolchain_sha256': digest(sdk / 'build/cmake/ohos.toolchain.cmake'),
+    }
     boring, curl, zlib = sources(manifest, options.source_cache.resolve())
     parallel = str(min(os.cpu_count() or 2, 8))
     boring_build = work / 'boringssl'
     configure(cmake, boring, boring_build, [*common, '-DBUILD_SHARED_LIBS=OFF',
-         '-DBUILD_TESTING=OFF', '-DOPENSSL_NO_ASM=ON', '-DOPENSSL_SMALL=ON'])
+         '-DBUILD_TESTING=OFF', '-DOPENSSL_NO_ASM=ON', '-DOPENSSL_SMALL=ON'], identity)
     run([cmake, '--build', boring_build, '--target', 'ssl', 'crypto', '--parallel', parallel])
     zlib_build = work / 'zlib'
     configure(cmake, zlib, zlib_build, [*common, '-DZLIB_BUILD_SHARED=OFF',
-         '-DZLIB_BUILD_STATIC=ON', '-DZLIB_BUILD_TESTING=OFF'])
+         '-DZLIB_BUILD_STATIC=ON', '-DZLIB_BUILD_TESTING=OFF'], identity)
     run([cmake, '--build', zlib_build, '--target', 'zlibstatic', '--parallel', parallel])
     includes = work / 'zlib-include'
     includes.mkdir(exist_ok=True)
@@ -138,7 +146,7 @@ def main():
     configure(cmake, ROOT / 'tool/ohos', curl_build, [*common,
          f'-DEH_CURL_SOURCE={curl}', f'-DEH_BORINGSSL_SOURCE={boring}',
          f'-DEH_BORINGSSL_BUILD={boring_build}', f'-DZLIB_LIBRARY={zlib_build}/libz.a',
-         f'-DZLIB_INCLUDE_DIR={includes}'])
+         f'-DZLIB_INCLUDE_DIR={includes}'], identity)
     run([cmake, '--build', curl_build, '--parallel', parallel])
     if 'HAVE_SSL_SET1_ECH_CONFIG_LIST:INTERNAL=1' not in (curl_build / 'CMakeCache.txt').read_text():
         raise RuntimeError('libcurl was built without BoringSSL ECH support')
@@ -158,14 +166,14 @@ def main():
     (stage / 'metadata.json').write_text(json.dumps({
         'schema': 1, 'target': f'ohos-{options.arch}',
         'curl': manifest['curl'], 'boringssl': manifest['boringssl'], 'zlib': manifest['zlib'],
-        'native_sdk': json.loads((sdk / 'oh-uni-package.json').read_text()),
+        'native_sdk': sdk_metadata,
     }, indent=2) + '\n')
     if options.deps_only:
         return
     bridge = work / 'bridge'
     configure(cmake, ROOT / 'src', bridge, [*common,
          f'-DEH_DEPS_ROOT={stage}', f'-DEH_DART_INCLUDE={options.dart_sdk.resolve()}/include',
-         '-DEH_BUILD_SMOKE=ON'])
+         '-DEH_BUILD_SMOKE=ON'], identity)
     run([cmake, '--build', bridge, '--parallel', parallel])
     print(f'OpenHarmony library: {bridge}/out/libech_http.so', flush=True)
 

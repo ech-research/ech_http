@@ -1,6 +1,8 @@
 # OpenHarmony / HarmonyOS 原生适配
 
-本分支支持通过 Flutter-OH 的 Native Assets 构建和打包 `ech_http`。
+[English](ohos.md) | [简体中文](ohos.zh-CN.md)
+
+支持通过 Flutter-OH 的 Native Assets 构建和打包 `ech_http`。
 保留现有 `EchClient`、ECH、证书校验、代理、gzip 和流式响应 API。
 支持 `arm64`（手机、平板）和 `x64`；各架构的验证结果见下文。
 
@@ -15,7 +17,7 @@
   `62357a93d653bf844f730bb1f4b7cc9e2139d14e` 已包含该功能。
   仅有旧版 FFI 插件打包支持的 Flutter-OH 不满足要求。
 
-本分支允许使用 `code_assets` / `hooks` 的兼容版本范围，解决 Flutter-OH
+包允许使用 `code_assets` / `hooks` 的兼容版本范围，解决 Flutter-OH
 3.41 固定 `meta 1.17.0` 与 `hooks 2.2` 的依赖冲突。实际测试应用解析为
 `code_assets 1.2.1`、`hooks 2.0.2`，无需覆盖 Flutter SDK 的 `meta` 版本。
 
@@ -26,7 +28,8 @@ OHOS toolchain、sysroot 和架构编译，**不会使用 Linux 预编译依赖*
 
 ## 应用接入
 
-在 Flutter-OH 应用的 `pubspec.yaml` 中使用本分支，例如本地依赖：
+在 Flutter-OH 应用的 `pubspec.yaml` 中引用包含 OHOS 支持的 `ech_http`。
+开发与验证时可使用本地依赖：
 
 ```yaml
 dependencies:
@@ -146,4 +149,30 @@ sni=encrypted
 本地验证记录保存在 `build/ohos-runtime-smoke.log`。本次已验证 Flutter
 Native Assets 集成和公网 HTTPS/ECH；gzip、代理、取消请求、isolate 退出
 等行为已覆盖桌面回归测试，尚未在鸿蒙真机上逐项复测。
-x64 仅完成交叉编译和构建钩子检查，Release HAP 及远程 CI 尚未运行验证。
+x64 仅完成交叉编译和构建钩子检查。初次本地真机验证未包含 Release HAP
+与远程 CI；后续远程验证结果见下文记录。
+
+## 缓存与工具链切换
+
+构建目录按架构区分。源码构建脚本为每个依赖和独立编译的桥接层记录源码绝对路径、
+配置参数、BoringSSL/curl/zlib 版本与摘要、SDK 元数据及 toolchain 摘要。
+这些输入不变时复用 Ninja 增量产物；输入改变时清理对应的生成目录，
+重新运行配置探测和编译，避免依赖升级后出现源码目录冲突或使用旧探测结果。
+迁移没有配置记录的旧构建目录时也会重新生成。
+已下载的源码独立保存，不受 CMake 构建目录清理影响。
+构建钩子的桥接层也会在包源码路径变更时重置 CMake 元数据。
+
+切换标准 Dart 与 Flutter-OH 内置 Dart 时，应重新生成应用的 `.dart_tool`
+并运行 `flutter pub get`，避免旧 SDK 编译的 `hook.dill` 导致
+`Invalid kernel binary format version`。CI 中包级检查始终使用原 Dart SDK，
+Flutter-OH 测试应用使用自身独立的 `.dart_tool` 和内置 Dart。
+
+运行无需网络或 OHOS SDK 的缓存回归检查：
+
+```sh
+python3 tool/test_build_ohos.py
+```
+
+CI 的 OHOS 作业检查 SDK 识别、缓存失效、arm64/x64 构建钩子输出，
+以及固定 Flutter-OH 工具链的未签名 Release HAP 打包。远程构建不能
+替代签名 HAP 的真机运行检查。
