@@ -150,6 +150,22 @@ jobs:
         run: |
           flutter pub get
           flutter build hap --release --no-codesign
+      - name: Verify the HAP contains the native library and asset mapping
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from zipfile import ZipFile
+          haps = list(Path('build/flutter_smoke/build/ohos/hap').glob('*.hap'))
+          assert haps, 'No HAP was produced'
+          for path in haps:
+              with ZipFile(path) as hap:
+                  assert 'libs/arm64-v8a/libech_http.so' in hap.namelist()
+                  manifest = json.loads(hap.read('resources/rawfile/flutter_assets/NativeAssetsManifest.json'))
+                  asset = manifest['native-assets']['ohos_arm64']['package:ech_http/ech_http_bindings']
+                  assert asset == ['absolute', 'libech_http.so'], asset
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: ohos-native-assets

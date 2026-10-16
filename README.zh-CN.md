@@ -192,7 +192,7 @@ final client = EchClient(
 
 ## 离线构建与二进制缓存配置
 
-默认情况下，构建钩子会在首次构建时自动下载所需的依赖 SDK 并缓存在 `.dart_tool` 目录下。在 CI/CD 流水线或离线隔离环境中，可以在消费方项目的 `pubspec.yaml` 中指定持久化的共享缓存目录：
+Windows、Linux、Apple 和 Android 目标的构建钩子会在首次构建时自动下载依赖 SDK 并缓存在 `.dart_tool` 目录下。在 CI/CD 流水线或离线隔离环境中，可以在消费方项目的 `pubspec.yaml` 中指定持久化的共享缓存目录：
 
 ```yaml
 hooks:
@@ -204,6 +204,9 @@ hooks:
 - 配置路径相对于使用该库的 `pubspec.yaml`。
 - 构建钩子会依据 `lib/src/build_support/dependencies.json` 中的 SHA-256 散列严格核验下载档案的完整性。
 - 每次构建都会校验解压文件；若本地解压文件损坏或被修改，钩子会自动基于缓存的压缩包进行自愈修复。
+
+OHOS 使用源码缓存，`source_cache`、缓存失效和 Dart SDK 切换说明见
+[鸿蒙指南](doc/ohos.zh-CN.md#缓存与工具链切换)。
 
 ---
 

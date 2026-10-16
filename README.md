@@ -196,7 +196,7 @@ final client = EchClient(
 
 ## Offline Builds & Binary Caching
 
-By default, Dart build hooks download precompiled dependency SDKs on the first build and cache them under `.dart_tool`. For CI/CD environments or reproducible offline builds, configure a shared binary cache directory in your application's `pubspec.yaml`:
+On Windows, Linux, Apple, and Android targets, Dart build hooks download precompiled dependency SDKs on the first build and cache them under `.dart_tool`. For CI/CD environments or reproducible offline builds, configure a shared binary cache directory in your application's `pubspec.yaml`:
 
 ```yaml
 hooks:
@@ -208,6 +208,10 @@ hooks:
 - Paths are relative to the consuming project's `pubspec.yaml`.
 - The build hook verifies the SHA-256 checksum of downloaded archives against `lib/src/build_support/dependencies.json`.
 - Cached archives are validated on each build; any damaged or modified extracted files are automatically repaired from the cached archive.
+
+OHOS uses a source cache instead of precompiled SDKs. See the
+[OHOS guide](doc/ohos.md#caching-and-dart-sdk-changes) for `source_cache`,
+cache invalidation, and switching between Dart SDKs.
 
 ---
 
