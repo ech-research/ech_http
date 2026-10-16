@@ -24,6 +24,20 @@ def run(args):
     subprocess.run(list(map(str, args)), check=True)
 
 
+def configure(cmake, source, build, arguments):
+    # A Git dependency update changes the package root while the hook's shared
+    # build directory stays put. Preserve downloads/libraries, reset metadata.
+    cache = build / 'CMakeCache.txt'
+    prefix = 'CMAKE_HOME_DIRECTORY:INTERNAL='
+    if cache.is_file():
+        homes = [line[len(prefix):] for line in cache.read_text().splitlines()
+                 if line.startswith(prefix)]
+        if homes and Path(homes[0]).resolve() != source.resolve():
+            cache.unlink()
+            shutil.rmtree(build / 'CMakeFiles', ignore_errors=True)
+    run([cmake, '-S', source, '-B', build, *arguments])
+
+
 def digest(path):
     with path.open('rb') as stream:
         return hashlib.file_digest(stream, 'sha256').hexdigest()
@@ -109,11 +123,11 @@ def main():
     boring, curl, zlib = sources(manifest, options.source_cache.resolve())
     parallel = str(min(os.cpu_count() or 2, 8))
     boring_build = work / 'boringssl'
-    run([cmake, '-S', boring, '-B', boring_build, *common, '-DBUILD_SHARED_LIBS=OFF',
+    configure(cmake, boring, boring_build, [*common, '-DBUILD_SHARED_LIBS=OFF',
          '-DBUILD_TESTING=OFF', '-DOPENSSL_NO_ASM=ON', '-DOPENSSL_SMALL=ON'])
     run([cmake, '--build', boring_build, '--target', 'ssl', 'crypto', '--parallel', parallel])
     zlib_build = work / 'zlib'
-    run([cmake, '-S', zlib, '-B', zlib_build, *common, '-DZLIB_BUILD_SHARED=OFF',
+    configure(cmake, zlib, zlib_build, [*common, '-DZLIB_BUILD_SHARED=OFF',
          '-DZLIB_BUILD_STATIC=ON', '-DZLIB_BUILD_TESTING=OFF'])
     run([cmake, '--build', zlib_build, '--target', 'zlibstatic', '--parallel', parallel])
     includes = work / 'zlib-include'
@@ -121,7 +135,7 @@ def main():
     shutil.copyfile(zlib / 'zlib.h', includes / 'zlib.h')
     shutil.copyfile(zlib_build / 'zconf.h', includes / 'zconf.h')
     curl_build = work / 'curl'
-    run([cmake, '-S', ROOT / 'tool/ohos', '-B', curl_build, *common,
+    configure(cmake, ROOT / 'tool/ohos', curl_build, [*common,
          f'-DEH_CURL_SOURCE={curl}', f'-DEH_BORINGSSL_SOURCE={boring}',
          f'-DEH_BORINGSSL_BUILD={boring_build}', f'-DZLIB_LIBRARY={zlib_build}/libz.a',
          f'-DZLIB_INCLUDE_DIR={includes}'])
@@ -149,7 +163,7 @@ def main():
     if options.deps_only:
         return
     bridge = work / 'bridge'
-    run([cmake, '-S', ROOT / 'src', '-B', bridge, *common,
+    configure(cmake, ROOT / 'src', bridge, [*common,
          f'-DEH_DEPS_ROOT={stage}', f'-DEH_DART_INCLUDE={options.dart_sdk.resolve()}/include',
          '-DEH_BUILD_SMOKE=ON'])
     run([cmake, '--build', bridge, '--parallel', parallel])

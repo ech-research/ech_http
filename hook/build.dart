@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 
 import 'package:ech_http/src/build_support/prebuilt.dart';
 import 'package:ech_http/src/build_support/ohos.dart';
+import 'package:ech_http/src/build_support/cmake.dart';
 
 Future<void> main(List<String> args) async {
   await build(args, (input, output) async {
@@ -56,6 +57,7 @@ Future<void> main(List<String> args) async {
       Uri.file(manifestPath),
       Uri.file(p.join(root, 'lib', 'src', 'build_support', 'prebuilt.dart')),
       Uri.file(p.join(root, 'lib', 'src', 'build_support', 'ohos.dart')),
+      Uri.file(p.join(root, 'lib', 'src', 'build_support', 'cmake.dart')),
     ]);
     await for (final file in Directory(
       p.join(root, 'src'),
@@ -129,6 +131,7 @@ Future<void> main(List<String> args) async {
       output.dependencies.add(Uri.file(p.join(dartInclude, header)));
     }
     final nativeBuild = p.join(out, 'native');
+    await prepareCmakeDirectory(p.join(root, 'src'), nativeBuild);
     stderr.writeln('ech_http: compiling C++ bridge with $target dependencies');
     await runner.run(tools.cmake, [
       '-S',
