@@ -1,0 +1,15 @@
+if(TARGET EchHttp::curl)
+  return()
+endif()
+get_filename_component(_eh_root "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
+foreach(_eh_lib curl ssl crypto zlib)
+  add_library(EchHttp::${_eh_lib} STATIC IMPORTED)
+  set_target_properties(EchHttp::${_eh_lib} PROPERTIES
+    IMPORTED_LOCATION "${_eh_root}/lib/lib${_eh_lib}.a"
+    INTERFACE_INCLUDE_DIRECTORIES "${_eh_root}/include")
+endforeach()
+find_package(Threads REQUIRED)
+set_property(TARGET EchHttp::curl PROPERTY INTERFACE_COMPILE_DEFINITIONS CURL_STATICLIB)
+set_property(TARGET EchHttp::curl PROPERTY INTERFACE_LINK_LIBRARIES EchHttp::ssl EchHttp::zlib)
+set_property(TARGET EchHttp::ssl PROPERTY INTERFACE_LINK_LIBRARIES EchHttp::crypto)
+set_property(TARGET EchHttp::crypto PROPERTY INTERFACE_LINK_LIBRARIES Threads::Threads ${CMAKE_DL_LIBS} m)

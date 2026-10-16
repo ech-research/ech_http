@@ -4,3 +4,4 @@ coverage/
 pubspec.lock
 *.jpg
 *.log
+__pycache__/

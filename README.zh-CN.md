@@ -8,6 +8,9 @@
 
 [English](README.md)
 
+本分支新增 [OpenHarmony / HarmonyOS 构建支持](doc/ohos.zh-CN.md)，
+通过 Flutter-OH Native Assets 从固定版本源码构建原生依赖，详见接入与验证说明。
+
 `ech_http` 是专为 Dart 和 Flutter 打造的企业级 HTTP 客户端，深度集成了 **TLS 密文客户端问候（Encrypted Client Hello, ECH）**、HTTP CONNECT 代理、自定义 PKI 信任根及流式数据传输功能。完全兼容官方 `package:http.Client` 接口规范。
 
 底层核心由基于 **libcurl** 和 **BoringSSL** 构建的 C++17 原生引擎驱动，通过 Dart 现代构建钩子（Build Hooks / `code_assets`）实现跨平台自动打包。**在运行时，无需启动任何外部后台进程、无需部署本地监听代理、无需注册 Flutter 平台插件通道，也无需应用层手动管理动态链接库加载。**
@@ -70,9 +73,10 @@ flowchart TD
 | **macOS** | `x64`, `arm64` | macOS 系统, Xcode Command Line Tools, CMake, Ninja | macOS 10.15+ (x64) / 11.0+ (arm64) |
 | **iOS** | `arm64` (真机), `arm64`/`x64` (模拟器) | macOS 系统, Xcode, CMake, Ninja | iOS 13.0+ |
 | **Android** | `arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86` | Android NDK r28.2+ (或 Flutter 自带 NDK), CMake, Ninja | Android API Level 21+ (5.0 Lollipop) |
+| **OpenHarmony / HarmonyOS** | `arm64`, `x64` | OHOS native SDK、Python 3.12+、Git、Go、CMake、Ninja；HAP 需要 Flutter-OH Native Assets | 见[鸿蒙验证说明](doc/ohos.zh-CN.md) |
 
 > [!NOTE]
-> 当前暂不支持浏览器 Web 环境及原生鸿蒙（HarmonyOS）。Android 原生库使用静态 libc++ 链接，并满足 Android 15 强制要求的 16 KiB ELF 页面对齐。
+> 当前不支持浏览器 Web 环境。鸿蒙首次构建从固定版本源码编译依赖，其他平台使用预编译 SDK。Android 原生库使用静态 libc++ 链接，并满足 Android 15 强制要求的 16 KiB ELF 页面对齐。
 
 ---
 

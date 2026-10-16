@@ -2,6 +2,7 @@
 #include "ech_http.h"
 #include <dart_native_api.h>
 #include <condition_variable>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <deque>
@@ -51,7 +52,10 @@ int main(int argc, char **argv) {
   bool accepted = false, ok = false;
   for (;;) {
     std::unique_lock<std::mutex> lock(mutex);
-    ready.wait(lock, [] { return !events.empty(); });
+    if (!ready.wait_for(lock, std::chrono::seconds(35), [] { return !events.empty(); })) {
+      std::fprintf(stderr, "timed out waiting for native response events\n");
+      break;
+    }
     auto event = std::move(events.front());
     events.pop_front();
     lock.unlock();
@@ -70,5 +74,5 @@ int main(int argc, char **argv) {
   eh_request_destroy(request);
   eh_client_destroy(client);
   std::printf("body bytes=%zu\n", bytes);
-  return ok && accepted ? 0 : 1;
+  return ok && (argv[3][0] == '\0' || accepted) ? 0 : 1;
 }

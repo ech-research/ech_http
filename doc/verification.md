@@ -42,7 +42,8 @@ We distinguish between three tiers of verification:
 | **Android** | `arm64-v8a` | **Tier 1** | Physical device run (API 35), live ECH handshake, authenticated retry, connection reuse | Non-standard custom Android ROMs |
 | **Android** | `armeabi-v7a`, `x86_64` | **Tier 2** | Flutter Debug APK packaging for both ABIs | Runtime execution on physical 32-bit ARM / x86_64 devices |
 | **Android** | `x86` | **Tier 2** | NDK bridge build and link check in CI | 32-bit x86 Android runtime execution |
-| **Web / HarmonyOS** | All | **Tier 3** | Not supported by this native C++ FFI architecture | N/A |
+| **OpenHarmony / HarmonyOS** | arm64, x64 | **Tier 2** | Both architectures cross-compile through the build hook; a signed arm64 Flutter Debug HAP returns HTTP 200 with ECH accepted on MatePad mini | See the [OHOS guide](ohos.zh-CN.md) for runtime scope; full suite not repeated on OHOS, no x64 device attached |
+| **Web** | All | **Tier 3** | Not supported by this native C++ FFI architecture | N/A |
 
 ---
 

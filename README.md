@@ -1,5 +1,9 @@
 # ech_http
 
+This fork adds [OpenHarmony / HarmonyOS build support](doc/ohos.zh-CN.md)
+using Flutter-OH Native Assets and pinned source builds of the native dependencies.
+See that guide for toolchain requirements and verification limits.
+
 [![Dart SDK](https://img.shields.io/badge/Dart-3.10+-0175C2.svg?logo=dart)](https://dart.dev)
 [![Flutter](https://img.shields.io/badge/Flutter-3.38+-02569B.svg?logo=flutter)](https://flutter.dev)
 [![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Linux%20%7C%20Windows-blue.svg)](#supported-platforms-and-toolchain)
@@ -73,9 +77,10 @@ prompt cleanup.
 | **macOS** | `x64`, `arm64` | macOS host, Xcode Command Line Tools, CMake, Ninja | macOS 10.15+ (x64) / 11.0+ (arm64) |
 | **iOS** | `arm64` (device), `arm64`/`x64` (simulator) | macOS host, Xcode, CMake, Ninja | iOS 13.0+ |
 | **Android** | `arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86` | Android NDK r28.2+ (or Flutter bundled NDK), CMake, Ninja | Android API level 21+ (5.0 Lollipop) |
+| **OpenHarmony / HarmonyOS** | `arm64`, `x64` | OHOS native SDK, Python 3.12+, Git, Go, CMake, Ninja; Flutter-OH Native Assets for HAPs | See [OHOS validation](doc/ohos.zh-CN.md) |
 
 > [!NOTE]
-> Web (Browsers) and native HarmonyOS are not currently supported. Android binaries link against static libc++ and use 16 KiB ELF segment alignment for Android 15 compatibility.
+> Web (Browsers) is not supported. OHOS builds its pinned dependencies from source on the first build; the other platforms use prebuilt SDKs. Android binaries link against static libc++ and use 16 KiB ELF segment alignment for Android 15 compatibility.
 
 ---
 

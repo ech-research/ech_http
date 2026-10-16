@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../hook/build.dart' as hook;
+import 'package:code_assets/code_assets.dart';
+import 'package:ech_http/src/build_support/ohos.dart';
 
 Future<void> main(List<String> args) async {
   if (args.length < 2 || args.length > 4) {
@@ -11,6 +13,12 @@ Future<void> main(List<String> args) async {
     );
   }
   final os = args[0], arch = args[1];
+  final ohos = os == 'ohos'
+      ? OhosBuildConfig.detect(
+          targetOS: OS.fromString('ohos'),
+          architecture: Architecture.fromString(arch),
+        )
+      : null;
   final simulator = args.length > 2 && args[2] == 'simulator';
   final root = Directory.current.absolute.uri;
   final directory = Directory.fromUri(
@@ -21,8 +29,18 @@ Future<void> main(List<String> args) async {
   await directory.create(recursive: true);
   final config = <String, Object>{
     'link_mode_preference': 'dynamic',
-    'target_os': os,
+    // Exercise the actual compatibility input supplied by Flutter-OH.
+    'target_os': ohos == null ? os : 'linux',
     'target_architecture': arch,
+    if (ohos != null)
+      'c_compiler': {
+        'cc':
+            '${ohos.nativeSdk}/llvm/bin/clang${Platform.isWindows ? '.exe' : ''}',
+        'ar':
+            '${ohos.nativeSdk}/llvm/bin/llvm-ar${Platform.isWindows ? '.exe' : ''}',
+        'ld':
+            '${ohos.nativeSdk}/llvm/bin/ld.lld${Platform.isWindows ? '.exe' : ''}',
+      },
     if (os == 'android') 'android': {'target_ndk_api': 21},
     if (os == 'ios')
       'ios': {
