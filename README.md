@@ -1,9 +1,5 @@
 # ech_http
 
-ech_http supports [OpenHarmony / HarmonyOS builds](doc/ohos.md)
-using Flutter-OH Native Assets and verified precompiled dependency SDKs.
-See that guide for toolchain requirements and verification limits.
-
 [![Dart SDK](https://img.shields.io/badge/Dart-3.10+-0175C2.svg?logo=dart)](https://dart.dev)
 [![Flutter](https://img.shields.io/badge/Flutter-3.38+-02569B.svg?logo=flutter)](https://flutter.dev)
 [![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20OHOS-blue.svg)](#supported-platforms-and-toolchain)
@@ -63,7 +59,7 @@ prompt cleanup.
 - **Authenticated ECH Retries**: Supports up to 2 automated ECH retries when the server responds with a valid TLS `retry_configs` rejection. Public names are strictly validated before retrying.
 - **Separation of Destination Routing and SNI**: IP address overrides (`addresses`) redirect only the underlying TCP socket or proxy CONNECT tunnel. The TLS inner SNI, certificate identity verification, and HTTP `Host` header always correspond to the original requested hostname.
 - **Strict TLS Verification**: Every connection strictly validates the server's certificate chain and hostname against the bundled Mozilla CA root certificates. There is **no insecure mode** or certificate bypass switch. Custom PKI roots can be explicitly loaded via `trustedRootsPem`.
-- **Automatic Native Builds**: Build hooks (`hook/build.dart`) download verified precompiled dependency SDKs for every supported native platform, including OHOS, and compile only the lightweight C++ bridge locally. BoringSSL, curl, and zlib are built and released by independent dependency repositories.
+- **High-Performance Build Hooks**: Build hooks (`hook/build.dart`) automatically download verified precompiled dependency SDKs for the exact target platform, compiling only the lightweight C++ bridge locally (~15 s cold build). No need to compile BoringSSL or libcurl from scratch.
 - **Zero Runtime Daemons**: Communicates directly through Dart FFI within the host process memory space, avoiding child processes, socket proxy bottlenecks, and OS port conflicts.
 
 ---
@@ -77,10 +73,13 @@ prompt cleanup.
 | **macOS** | `x64`, `arm64` | macOS host, Xcode Command Line Tools, CMake, Ninja | macOS 10.15+ (x64) / 11.0+ (arm64) |
 | **iOS** | `arm64` (device), `arm64`/`x64` (simulator) | macOS host, Xcode, CMake, Ninja | iOS 13.0+ |
 | **Android** | `arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86` | Android NDK r28.2+ (or Flutter bundled NDK), CMake, Ninja | Android API level 21+ (5.0 Lollipop) |
-| **OpenHarmony / HarmonyOS** | `arm64`, `x64` | OHOS native SDK, CMake, Ninja; Flutter-OH Native Assets for HAPs | SDK API 26; see [OHOS validation](doc/ohos.md) |
+| **OpenHarmony / HarmonyOS** | `arm64`, `x64` | OHOS native SDK, CMake, Ninja; Flutter-OH with Native Assets support | API 26 (verified) |
+
+For OHOS HAP builds, the hook locates the native SDK from the compiler path.
+Set `OHOS_NDK_HOME` to the native SDK directory if needed.
 
 > [!NOTE]
-> Web (Browsers) is not supported. All native platforms, including OHOS, use versioned dependency SDKs pinned by SHA-256. Android binaries link against static libc++ and use 16 KiB ELF segment alignment for Android 15 compatibility.
+> Web (Browsers) is not currently supported. Android binaries link against static libc++ and use 16 KiB ELF segment alignment for Android 15 compatibility.
 
 ---
 
@@ -194,7 +193,7 @@ final client = EchClient(
 
 ## Offline Builds & Binary Caching
 
-On all supported native targets, Dart build hooks download precompiled dependency SDKs on the first build and cache them under `.dart_tool`. For CI/CD environments or reproducible offline builds, configure a shared binary cache directory in your application's `pubspec.yaml`:
+By default, Dart build hooks download precompiled dependency SDKs on the first build and cache them under `.dart_tool`. For CI/CD environments or reproducible offline builds, configure a shared binary cache directory in your application's `pubspec.yaml`:
 
 ```yaml
 hooks:
@@ -206,10 +205,6 @@ hooks:
 - Paths are relative to the consuming project's `pubspec.yaml`.
 - The build hook verifies the SHA-256 checksum of downloaded archives against `lib/src/build_support/dependencies.json`.
 - Cached archives are validated on each build; any damaged or modified extracted files are automatically repaired from the cached archive.
-
-OHOS uses the same `binary_cache` mechanism. See the
-[OHOS guide](doc/ohos.md#caching-and-dart-sdk-changes) for SDK baselines,
-cache behavior, and switching between Dart SDKs.
 
 ---
 

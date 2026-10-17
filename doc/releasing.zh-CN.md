@@ -91,21 +91,22 @@ dart run example/ech_http_example.dart https://crypto.cloudflare.com/cdn-cgi/tra
 
 ## 3. 预编译原生 SDK 的更新与维护
 
-`ech_http` 依赖 4 个独立的公开构建仓库为 14 个目标平台与架构打包发布预编译 SDK：
+`ech_http` 依赖 5 个独立的公开构建仓库为 16 个目标平台与架构打包发布预编译 SDK：
 
 - [libechhttp-win32-build](https://github.com/ech-research/libechhttp-win32-build/releases)（Windows: x64, arm64, ia32）
 - [libechhttp-darwin-build](https://github.com/ech-research/libechhttp-darwin-build/releases)（macOS / iOS: x64, arm64）
 - [libechhttp-android-build](https://github.com/ech-research/libechhttp-android-build/releases)（Android: arm64-v8a, armeabi-v7a, x86_64, x86）
 - [libechhttp-linux-build](https://github.com/ech-research/libechhttp-linux-build/releases)（Linux: x64, arm64）
+- [libechhttp_ohos_build](https://github.com/tignioj/libechhttp_ohos_build/releases)（OpenHarmony / HarmonyOS: arm64, x64）
 
 ### 升级预编译依赖版本
 
 当 libcurl、BoringSSL 源码更新或编译参数调整时：
 
-1. 在上述 4 个构建仓库中触发 GitHub Actions 并发布新的 Release 版本。
+1. 在相应平台的构建仓库中触发 GitHub Actions 并发布新的 Release 版本。
 2. 在本项目根目录下运行维护脚本，填入经过评审的新 Release 标签：
    ```sh
-   python tool/update_prebuilt.py win32=v0.1.1 darwin=v0.1.2 android=v0.1.1 linux=v0.1.1
+   python tool/update_prebuilt.py win32=v0.1.1 darwin=v0.1.2 android=v0.1.1 linux=v0.1.1 ohos=v0.1.0
    ```
    *(要求本地装有 Python 3.9+ 且具备经过身份授权的 GitHub CLI `gh`)*。
 3. 检查并核对 `lib/src/build_support/dependencies.json` 中自动更新的下载链接与 SHA-256 散列值。
@@ -140,6 +141,7 @@ dart run example/ech_http_example.dart https://crypto.cloudflare.com/cdn-cgi/tra
 - macOS 环境（Intel x64 与 Apple Silicon arm64 构建及测试）
 - Android 构建（Flutter 打包 arm64、arm、x64、x86 APK）
 - iOS 构建（C++ 桥接编译及 Flutter `--no-codesign` 打包）
+- OHOS 构建（arm64/x64 桥接编译及 Flutter 未签名 Release HAP 打包）
 
 发布新版本前，确保 CI 所有任务绿灯通过。具体覆盖范围详见 [doc/verification.zh-CN.md](verification.zh-CN.md)。
 

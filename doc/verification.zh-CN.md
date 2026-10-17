@@ -37,7 +37,7 @@ Flutter Android APK、iOS 未签名 Release 应用、iOS 模拟器 Debug 应用�
 | **Android** | `arm64-v8a` | **Tier 1** | 真实设备运行（API 35），公网 ECH 握手、认证重试、连接复用均通过 | 各类深度定制的非标准第三方 Android ROM |
 | **Android** | `armeabi-v7a`, `x86_64` | **Tier 2** | Flutter Debug APK 多 ABI 打包测试通过 | 32 位 ARM / x86_64 物理机运行时执行 |
 | **Android** | `x86` | **Tier 2** | CI 中 NDK 桥接构建与链接核验通过 | 32 位 x86 Android 实体机运行时执行 |
-| **OpenHarmony / HarmonyOS** | arm64、x64 | **Tier 2** | arm64/x64 预编译 SDK 与胶水代码构建；2026-10-17 使用 v0.1.0 SDK 的签名 Debug HAP 在 MatePad mini（API 26）成功加载原生库，返回 HTTP 200、ECH 被接受、`sni=encrypted`、TLS 1.3 | 真机验证范围见[鸿蒙说明](ohos.zh-CN.md)；完整功能套件、签名 Release HAP 和低 API 兼容性未在鸿蒙复测，未连接 x64 设备 |
+| **OpenHarmony / HarmonyOS** | `arm64`, `x64` | **Tier 2** | 预编译 SDK 构建；MatePad mini（API 26）签名 Debug HAP 原生库加载、HTTP 200 和 ECH 通过 | 未验证签名 Release HAP、x64 真机、低 API 及代理/gzip/取消请求/isolate 退出的真机回归 |
 | **Web** | 全部架构 | **Tier 3** | C++ FFI 原生引擎架构不支持 Web | 不适用 |
 
 ---

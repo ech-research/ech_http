@@ -91,21 +91,22 @@ Set `ECH_PROXY`, `ECH_CONFIG_DOMAIN`, or `ECH_ADDRESSES` in your environment to 
 
 ## 3. Precompiled Dependency SDK Maintenance
 
-`ech_http` pins versioned precompiled SDKs for 14 target architectures across four public build repositories:
+`ech_http` pins versioned precompiled SDKs for 16 target architectures across five public build repositories:
 
 - [libechhttp-win32-build](https://github.com/ech-research/libechhttp-win32-build/releases) (Windows: x64, arm64, ia32)
 - [libechhttp-darwin-build](https://github.com/ech-research/libechhttp-darwin-build/releases) (macOS / iOS: x64, arm64)
 - [libechhttp-android-build](https://github.com/ech-research/libechhttp-android-build/releases) (Android: arm64-v8a, armeabi-v7a, x86_64, x86)
 - [libechhttp-linux-build](https://github.com/ech-research/libechhttp-linux-build/releases) (Linux: x64, arm64)
+- [libechhttp_ohos_build](https://github.com/tignioj/libechhttp_ohos_build/releases) (OpenHarmony / HarmonyOS: arm64, x64)
 
 ### Upgrading Precompiled SDKs
 
 When dependency versions (such as libcurl or BoringSSL) or compiler flags change:
 
-1. Trigger and publish new GitHub Releases in the four platform build repositories.
+1. Trigger and publish new GitHub Releases in the relevant platform build repositories.
 2. In the `ech_http` repository, run the maintainer automation tool with the new release tags:
    ```sh
-   python tool/update_prebuilt.py win32=v0.1.1 darwin=v0.1.2 android=v0.1.1 linux=v0.1.1
+   python tool/update_prebuilt.py win32=v0.1.1 darwin=v0.1.2 android=v0.1.1 linux=v0.1.1 ohos=v0.1.0
    ```
    *(Requires Python 3.9+ and an authenticated GitHub CLI `gh`)*.
 3. Review the modified pins and SHA-256 digests in `lib/src/build_support/dependencies.json`.
@@ -140,6 +141,7 @@ The repository includes a GitHub Actions CI workflow (`.github/workflows/ci.yml`
 - macOS desktop runners (Intel x64 and Apple Silicon arm64)
 - Android APK packaging (Flutter build across arm64, arm, x64, x86)
 - iOS build targets (bridge build and Flutter release build with `--no-codesign`)
+- OHOS bridge builds (arm64/x64) and unsigned Flutter Release HAP packaging
 
 Run or verify the CI pipeline before publishing. See [doc/verification.md](verification.md) for detailed verification coverage.
 

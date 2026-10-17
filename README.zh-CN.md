@@ -8,9 +8,6 @@
 
 [English](README.md)
 
-`ech_http` 支持 [OpenHarmony / HarmonyOS 构建](doc/ohos.zh-CN.md)，
-通过 Flutter-OH Native Assets 下载经过校验的预编译 SDK，本地仅编译胶水代码，详见接入与验证说明。
-
 `ech_http` 是专为 Dart 和 Flutter 打造的企业级 HTTP 客户端，深度集成了 **TLS 密文客户端问候（Encrypted Client Hello, ECH）**、HTTP CONNECT 代理、自定义 PKI 信任根及流式数据传输功能。完全兼容官方 `package:http.Client` 接口规范。
 
 底层核心由基于 **libcurl** 和 **BoringSSL** 构建的 C++17 原生引擎驱动，通过 Dart 现代构建钩子（Build Hooks / `code_assets`）实现跨平台自动打包。**在运行时，无需启动任何外部后台进程、无需部署本地监听代理、无需注册 Flutter 平台插件通道，也无需应用层手动管理动态链接库加载。**
@@ -59,7 +56,7 @@ flowchart TD
 - **原生支持认证重试（Authenticated Retry）**：当服务端返回合法的 TLS `retry_configs`（配置拒绝重试）时，客户端会自动进行最多 2 次认证重试。重试前会严格校验外层公用名（Public Name）以防篡改。
 - **物理路由与证书身份严格解耦**：自定义目标 IP 地址列表（`addresses`）仅重定向底层的 TCP Socket 物理连接或代理 CONNECT 隧道；TLS 握手中的内层 SNI、服务端证书主体身份核验以及 HTTP `Host` 请求头始终保持原始目标域名不变。
 - **严格证书校验，无旁路后门**：所有连接默认基于内置的 Mozilla CA 根证书库严格验证证书链与主机名。**库中未设置任何跳过证书验证的不安全开关**。如需使用企业私有 PKI，可通过 `trustedRootsPem` 显式替换信任根。
-- **自动原生构建**：借助 Dart `hook/build.dart`，各原生平台均按需拉取经过校验的预编译 SDK，本地仅编译轻量级 C++ 桥接代码。BoringSSL、curl 和 zlib 由独立的依赖仓库提前编译、发布。
+- **极速构建钩子机制**：借助 Dart `hook/build.dart`，在首次构建时按需拉取对应平台的预编译 SDK，本地仅需编译轻量级的 C++ 桥接代码（冷构建仅约 15 秒），无需在本地完整编译庞大的 BoringSSL 与 libcurl。
 - **零外部守护进程**：直接在应用主进程内存中通过 Dart FFI 调用原生接口，避免了子进程开销、本地端口占用冲突及系统级代理注入风险。
 
 ---
@@ -73,10 +70,13 @@ flowchart TD
 | **macOS** | `x64`, `arm64` | macOS 系统, Xcode Command Line Tools, CMake, Ninja | macOS 10.15+ (x64) / 11.0+ (arm64) |
 | **iOS** | `arm64` (真机), `arm64`/`x64` (模拟器) | macOS 系统, Xcode, CMake, Ninja | iOS 13.0+ |
 | **Android** | `arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86` | Android NDK r28.2+ (或 Flutter 自带 NDK), CMake, Ninja | Android API Level 21+ (5.0 Lollipop) |
-| **OpenHarmony / HarmonyOS** | `arm64`, `x64` | OHOS native SDK、CMake、Ninja；HAP 需要 Flutter-OH Native Assets | SDK API 26；见[鸿蒙验证说明](doc/ohos.zh-CN.md) |
+| **OpenHarmony / HarmonyOS** | `arm64`, `x64` | OHOS native SDK、CMake、Ninja；支持 Native Assets 的 Flutter-OH | API 26（已验证） |
+
+构建 OHOS HAP 时，钩子从编译器路径定位 native SDK；需要时可通过
+`OHOS_NDK_HOME` 指定 native SDK 目录。
 
 > [!NOTE]
-> 当前不支持浏览器 Web 环境。包括鸿蒙在内的原生平台均使用固定版本、SHA-256 校验的预编译依赖 SDK。Android 原生库使用静态 libc++ 链接，并满足 Android 15 强制要求的 16 KiB ELF 页面对齐。
+> 当前暂不支持浏览器 Web 环境。Android 原生库使用静态 libc++ 链接，并满足 Android 15 强制要求的 16 KiB ELF 页面对齐。
 
 ---
 
@@ -190,7 +190,7 @@ final client = EchClient(
 
 ## 离线构建与二进制缓存配置
 
-各原生目标的构建钩子会在首次构建时自动下载依赖 SDK 并缓存在 `.dart_tool` 目录下。在 CI/CD 流水线或离线隔离环境中，可以在消费方项目的 `pubspec.yaml` 中指定持久化的共享缓存目录：
+默认情况下，构建钩子会在首次构建时自动下载所需的依赖 SDK 并缓存在 `.dart_tool` 目录下。在 CI/CD 流水线或离线隔离环境中，可以在消费方项目的 `pubspec.yaml` 中指定持久化的共享缓存目录：
 
 ```yaml
 hooks:
@@ -202,9 +202,6 @@ hooks:
 - 配置路径相对于使用该库的 `pubspec.yaml`。
 - 构建钩子会依据 `lib/src/build_support/dependencies.json` 中的 SHA-256 散列严格核验下载档案的完整性。
 - 每次构建都会校验解压文件；若本地解压文件损坏或被修改，钩子会自动基于缓存的压缩包进行自愈修复。
-
-OHOS 同样使用 `binary_cache`；SDK 版本、缓存和 Dart SDK 切换说明见
-[鸿蒙指南](doc/ohos.zh-CN.md#缓存与工具链切换)。
 
 ---
 
