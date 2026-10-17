@@ -8,20 +8,30 @@ import 'package:hooks/hooks.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:ech_http/src/build_support/prebuilt.dart';
+import 'package:ech_http/src/build_support/ohos.dart';
+import 'package:ech_http/src/build_support/cmake.dart';
 
 Future<void> main(List<String> args) async {
   await build(args, (input, output) async {
     if (!input.config.buildCodeAssets) return;
     final code = input.config.code;
-    if (![
-      OS.windows,
-      OS.linux,
-      OS.macOS,
-      OS.iOS,
-      OS.android,
-    ].contains(code.targetOS)) {
+    final ohos = OhosBuildConfig.detect(
+      targetOS: code.targetOS,
+      architecture: code.targetArchitecture,
+      compiler: code.cCompiler?.compiler,
+      sdkPath: input.userDefines.path('ohos_sdk')?.toFilePath(),
+      explicitlyOhos: input.userDefines['target'] == 'ohos',
+    );
+    if (ohos == null &&
+        ![
+          OS.windows,
+          OS.linux,
+          OS.macOS,
+          OS.iOS,
+          OS.android,
+        ].contains(code.targetOS)) {
       throw UnsupportedError(
-        'ech_http supports Android, iOS, Linux, macOS, and Windows',
+        'ech_http supports Android, iOS, Linux, macOS, Windows, and OHOS',
       );
     }
     final root = input.packageRoot.toFilePath();
@@ -46,21 +56,33 @@ Future<void> main(List<String> args) async {
     output.dependencies.addAll([
       Uri.file(manifestPath),
       Uri.file(p.join(root, 'lib', 'src', 'build_support', 'prebuilt.dart')),
+      Uri.file(p.join(root, 'lib', 'src', 'build_support', 'ohos.dart')),
+      Uri.file(p.join(root, 'lib', 'src', 'build_support', 'cmake.dart')),
     ]);
     await for (final file in Directory(
       p.join(root, 'src'),
     ).list(recursive: true)) {
       if (file is File) output.dependencies.add(file.uri);
     }
-    final target = dependencyTarget(
-      code.targetOS,
-      code.targetArchitecture,
-      iosSdk: code.targetOS == OS.iOS ? code.iOS.targetSdk : null,
-    );
+    final target = ohos == null
+        ? dependencyTarget(
+            code.targetOS,
+            code.targetArchitecture,
+            iosSdk: code.targetOS == OS.iOS ? code.iOS.targetSdk : null,
+          )
+        : 'ohos-${code.targetArchitecture.name}';
+    if (ohos != null) {
+      output.dependencies.addAll([
+        Uri.file(p.join(ohos.nativeSdk, 'oh-uni-package.json')),
+        Uri.file(
+          p.join(ohos.nativeSdk, 'build', 'cmake', 'ohos.toolchain.cmake'),
+        ),
+      ]);
+    }
     final dependency = PrebuiltDependency.fromManifest(manifest, target);
     final sdk = await preparePrebuilt(dependency, cache);
 
-    final tools = await _toolchain(code, runner);
+    final tools = await _toolchain(code, runner, ohos: ohos);
     runner.environment = tools.environment;
     final common = <String>[
       '-G',
@@ -82,6 +104,7 @@ Future<void> main(List<String> args) async {
       output.dependencies.add(Uri.file(p.join(dartInclude, header)));
     }
     final nativeBuild = p.join(out, 'native');
+    await prepareCmakeDirectory(p.join(root, 'src'), nativeBuild);
     stderr.writeln(
       'ech_http: compiling C++ bridge with prebuilt $target dependencies',
     );
@@ -129,9 +152,25 @@ final class _Tools {
   final List<String> arguments;
 }
 
-Future<_Tools> _toolchain(CodeConfig code, _Runner runner) async {
+Future<_Tools> _toolchain(
+  CodeConfig code,
+  _Runner runner, {
+  OhosBuildConfig? ohos,
+}) async {
   var environment = Map<String, String>.of(Platform.environment);
   final arguments = <String>[];
+  if (ohos != null) {
+    final bin = p.join(ohos.nativeSdk, 'build-tools', 'cmake', 'bin');
+    final suffix = Platform.isWindows ? '.exe' : '';
+    final cmake =
+        _onPath('cmake', environment) ?? _existing(p.join(bin, 'cmake$suffix'));
+    final ninja =
+        _onPath('ninja', environment) ?? _existing(p.join(bin, 'ninja$suffix'));
+    if (cmake == null || ninja == null) {
+      throw StateError('OHOS builds require CMake and Ninja');
+    }
+    return _Tools(cmake, ninja, environment, ohos.cmakeArguments);
+  }
   if (code.targetOS == OS.windows && !Platform.isWindows) {
     throw UnsupportedError('Windows targets require a Windows host with MSVC');
   }

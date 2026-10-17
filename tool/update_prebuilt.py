@@ -11,12 +11,13 @@ TARGETS = {
     'darwin': ['macos-x64', 'macos-arm64', 'ios-arm64-device', 'ios-arm64-simulator', 'ios-x64-simulator'],
     'android': ['android-arm', 'android-arm64', 'android-x64', 'android-ia32'],
     'linux': ['linux-x64', 'linux-arm64'],
+    'ohos': ['ohos-arm64', 'ohos-x64'],
 }
 
 
 def main():
     if not sys.argv[1:]:
-        raise SystemExit('Usage: python tool/update_prebuilt.py win32=v0.1.0 darwin=v0.1.1 android=v0.1.0 linux=v0.1.0')
+        raise SystemExit('Usage: python tool/update_prebuilt.py win32=v0.1.0 darwin=v0.1.1 android=v0.1.0 linux=v0.1.0 ohos=v0.1.0')
     path = Path(__file__).resolve().parents[1] / 'lib/src/build_support/dependencies.json'
     manifest = json.loads(path.read_text())
     targets = manifest.setdefault('targets', {})

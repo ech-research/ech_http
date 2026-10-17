@@ -42,13 +42,14 @@ We distinguish between three tiers of verification:
 | **Android** | `arm64-v8a` | **Tier 1** | Physical device run (API 35), live ECH handshake, authenticated retry, connection reuse | Non-standard custom Android ROMs |
 | **Android** | `armeabi-v7a`, `x86_64` | **Tier 2** | Flutter Debug APK packaging for both ABIs | Runtime execution on physical 32-bit ARM / x86_64 devices |
 | **Android** | `x86` | **Tier 2** | NDK bridge build and link check in CI | 32-bit x86 Android runtime execution |
-| **Web / HarmonyOS** | All | **Tier 3** | Not supported by this native C++ FFI architecture | N/A |
+| **OpenHarmony / HarmonyOS** | `arm64`, `x64` | **Tier 2** | Precompiled SDK builds; signed Debug HAP on MatePad mini (API 26): native loading, HTTP 200 and accepted ECH | Signed Release HAP, x64 devices, lower APIs, and proxy/gzip/cancellation/isolate device regressions unverified |
+| **Web** | All | **Tier 3** | Not supported by this native C++ FFI architecture | N/A |
 
 ---
 
 ## 2. Precompiled SDK Release Registry
 
-Precompiled dependency SDKs (statically built libcurl 8.22.0 + BoringSSL + zlib 1.3.2) are hosted in four dedicated public repositories:
+Precompiled dependency SDKs (statically built libcurl 8.22.0 + BoringSSL + zlib 1.3.2) are hosted in five dedicated public repositories:
 
 | Build Repository | Release Tag | Target Platforms & Architectures |
 | :--- | :--- | :--- |
@@ -56,6 +57,7 @@ Precompiled dependency SDKs (statically built libcurl 8.22.0 + BoringSSL + zlib 
 | [libechhttp-darwin-build](https://github.com/ech-research/libechhttp-darwin-build) | `v0.1.2` | macOS / iOS: `x64`, `arm64` (Device + Simulator) |
 | [libechhttp-android-build](https://github.com/ech-research/libechhttp-android-build) | `v0.1.1` | Android: `arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86` |
 | [libechhttp-linux-build](https://github.com/ech-research/libechhttp-linux-build) | `v0.1.1` | Linux: `x64`, `arm64` |
+| [libechhttp-ohos-build](https://github.com/ech-research/libechhttp-ohos-build) | `v0.1.0` | OpenHarmony / HarmonyOS: `arm64`, `x64` (SDK API 26) |
 
 All release archives and their SHA-256 digests are pinned in [lib/src/build_support/dependencies.json](../lib/src/build_support/dependencies.json).
 

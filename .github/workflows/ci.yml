@@ -8,7 +8,7 @@ on:
         description: Platform checks to run
         type: choice
         default: all
-        options: [all, desktop, android, apple]
+        options: [all, desktop, android, apple, ohos]
 permissions:
   contents: read
 concurrency:
@@ -88,3 +88,97 @@ jobs:
           flutter build ios --release --no-codesign
           flutter build ios --simulator --debug
           flutter build macos --debug
+
+  ohos:
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'all' || inputs.platform == 'ohos'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+      - run: sudo apt-get update && sudo apt-get install -y cmake ninja-build git python3
+      - uses: ErBWs/setup-ohos@3a251d7e29546c19a9f5fbd3aa4614f6df196910
+        with:
+          version: 26.0.0.821
+          cache: true
+      - run: dart pub get
+      - run: dart test test/ohos_build_test.dart test/prebuilt_test.dart -r expanded
+      - name: Cross-compile using the Flutter-OH compatibility protocol
+        shell: bash
+        run: |
+          for arch in arm64 x64; do
+            dart run tool/check_native_build.dart ohos "$arch"
+          done
+      - name: Collect native libraries and hook manifests
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          import re
+          import shutil
+          import struct
+          import subprocess
+          for arch in ('arm64', 'x64'):
+              manifest = Path(f'.dart_tool/verify/ohos-{arch}-device/output.json')
+              data = json.loads(manifest.read_text())
+              assert data['status'] == 'success'
+              assets = [a['encoding'] for a in data['assets']]
+              library = next(a['file'] for a in assets if a['id'] == 'package:ech_http/ech_http_bindings')
+              elf = Path(library).read_bytes()
+              assert elf[:6] == b'\x7fELF\x02\x01'
+              assert struct.unpack_from('<H', elf, 18)[0] == {'arm64': 183, 'x64': 62}[arch]
+              config = json.loads(manifest.with_name('input.json').read_text())
+              compiler = Path(config['config']['extensions']['code_assets']['c_compiler']['cc'])
+              dynamic = subprocess.check_output([str(compiler.parent / 'llvm-readelf'), '--dynamic', library], text=True)
+              needed = re.findall(r'\(NEEDED\).*?\[(.*?)\]', dynamic)
+              assert needed and all(name == 'libc.so' for name in needed), needed
+              destination = Path('build/ohos-native-assets') / arch
+              destination.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(library, destination / 'libech_http.so')
+              shutil.copyfile(manifest, destination / 'output.json')
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up the verified Flutter-OH toolchain
+        shell: bash
+        run: |
+          echo "ECH_HTTP_DART=$(command -v dart)" >> "$GITHUB_ENV"
+          git init "$RUNNER_TEMP/flutter-ohos"
+          git -C "$RUNNER_TEMP/flutter-ohos" remote add origin https://gitcode.com/CPF-Flutter/flutter_flutter.git
+          git -C "$RUNNER_TEMP/flutter-ohos" fetch --depth=1 origin 62357a93d653bf844f730bb1f4b7cc9e2139d14e
+          git -C "$RUNNER_TEMP/flutter-ohos" checkout --detach FETCH_HEAD
+          echo "$RUNNER_TEMP/flutter-ohos/bin" >> "$GITHUB_PATH"
+          echo "CI=true" >> "$GITHUB_ENV"
+      # Keep the package's hook kernel on the SDK that compiled it. The
+      # consumer below has a separate .dart_tool and uses Flutter-OH's Dart.
+      - run: '"$ECH_HTTP_DART" run tool/create_flutter_smoke.dart ohos'
+      - name: Build a Flutter consumer HAP with the native assets
+        working-directory: build/flutter_smoke
+        run: |
+          flutter pub get
+          flutter build hap --release --no-codesign
+      - name: Verify the HAP contains the native library and asset mapping
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from zipfile import ZipFile
+          haps = list(Path('build/flutter_smoke/build/ohos/hap').glob('*.hap'))
+          assert haps, 'No HAP was produced'
+          for path in haps:
+              with ZipFile(path) as hap:
+                  assert 'libs/arm64-v8a/libech_http.so' in hap.namelist()
+                  manifest = json.loads(hap.read('resources/rawfile/flutter_assets/NativeAssetsManifest.json'))
+                  asset = manifest['native-assets']['ohos_arm64']['package:ech_http/ech_http_bindings']
+                  assert asset == ['absolute', 'libech_http.so'], asset
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ohos-native-assets
+          path: |
+            build/ohos-native-assets/
+            build/flutter_smoke/build/ohos/hap/*.hap

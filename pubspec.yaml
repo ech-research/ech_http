@@ -22,10 +22,12 @@ topics:
   - networking
 dependencies:
   archive: ^4.0.9
-  code_assets: ^2.1.0
+  # Flutter-OH 3.41 pins meta 1.17; hooks 2.2 requires meta 1.19.
+  # The build hook uses APIs available in both protocol package generations.
+  code_assets: '>=1.2.1 <3.0.0'
   crypto: ^3.0.6
   ffi: ^2.1.4
-  hooks: ^2.2.0
+  hooks: '>=2.0.2 <3.0.0'
   http: ^1.6.0
   path: ^1.9.1
 dev_dependencies:

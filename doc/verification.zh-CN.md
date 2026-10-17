@@ -37,13 +37,14 @@ Flutter Android APK、iOS 未签名 Release 应用、iOS 模拟器 Debug 应用�
 | **Android** | `arm64-v8a` | **Tier 1** | 真实设备运行（API 35），公网 ECH 握手、认证重试、连接复用均通过 | 各类深度定制的非标准第三方 Android ROM |
 | **Android** | `armeabi-v7a`, `x86_64` | **Tier 2** | Flutter Debug APK 多 ABI 打包测试通过 | 32 位 ARM / x86_64 物理机运行时执行 |
 | **Android** | `x86` | **Tier 2** | CI 中 NDK 桥接构建与链接核验通过 | 32 位 x86 Android 实体机运行时执行 |
-| **Web / 原生鸿蒙** | 全部架构 | **Tier 3** | C++ FFI 原生引擎架构暂不支持 Web 与 HarmonyOS | 不适用 |
+| **OpenHarmony / HarmonyOS** | `arm64`, `x64` | **Tier 2** | 预编译 SDK 构建；MatePad mini（API 26）签名 Debug HAP 原生库加载、HTTP 200 和 ECH 通过 | 未验证签名 Release HAP、x64 真机、低 API 及代理/gzip/取消请求/isolate 退出的真机回归 |
+| **Web** | 全部架构 | **Tier 3** | C++ FFI 原生引擎架构不支持 Web | 不适用 |
 
 ---
 
 ## 2. 预编译 SDK 仓库索引
 
-预编译依赖库（静态构建的 libcurl 8.22.0、BoringSSL 与 zlib 1.3.2）托管在四个独立的公开构建仓库中：
+预编译依赖库（静态构建的 libcurl 8.22.0、BoringSSL 与 zlib 1.3.2）托管在五个独立的公开构建仓库中：
 
 | 构建仓库 | 发布 Tag | 支持的目标平台与架构 |
 | :--- | :--- | :--- |
@@ -51,6 +52,7 @@ Flutter Android APK、iOS 未签名 Release 应用、iOS 模拟器 Debug 应用�
 | [libechhttp-darwin-build](https://github.com/ech-research/libechhttp-darwin-build) | `v0.1.2` | macOS / iOS: `x64`, `arm64`（真机 + 模拟器） |
 | [libechhttp-android-build](https://github.com/ech-research/libechhttp-android-build) | `v0.1.1` | Android: `arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86` |
 | [libechhttp-linux-build](https://github.com/ech-research/libechhttp-linux-build) | `v0.1.1` | Linux: `x64`, `arm64` |
+| [libechhttp-ohos-build](https://github.com/ech-research/libechhttp-ohos-build) | `v0.1.0` | OpenHarmony / HarmonyOS: `arm64`, `x64` (SDK API 26) |
 
 每个 SDK 压缩包的 SHA-256 散列均固化在 [lib/src/build_support/dependencies.json](../lib/src/build_support/dependencies.json) 中。
 

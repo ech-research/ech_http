@@ -2,7 +2,7 @@
 
 [![Dart SDK](https://img.shields.io/badge/Dart-3.10+-0175C2.svg?logo=dart)](https://dart.dev)
 [![Flutter](https://img.shields.io/badge/Flutter-3.38+-02569B.svg?logo=flutter)](https://flutter.dev)
-[![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Linux%20%7C%20Windows-blue.svg)](#supported-platforms-and-toolchain)
+[![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20OHOS-blue.svg)](#supported-platforms-and-toolchain)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![ECH Standard](https://img.shields.io/badge/TLS%201.3-ECH%20(RFC%20Draft)-green.svg)](https://datatracker.ietf.org/doc/draft-ietf-tls-esni/)
 
@@ -34,7 +34,7 @@ flowchart TD
 
     subgraph BuildSystem["Dart Build Hook (Build Time)"]
         Hook["hook/build.dart"] -->|"Verify SHA-256"| SDKCache["Precompiled SDK Cache\n(.dart_tool or user_defines)"]
-        SDKCache -->|"Fetch Target Only"| PrebuiltRepo["GitHub Releases\n(Windows / Linux / Apple / Android)"]
+        SDKCache -->|"Fetch Target Only"| PrebuiltRepo["GitHub Releases\n(Windows / Linux / Apple / Android / OHOS)"]
         Hook -->|"Compile C++ Bridge Only"| CMakeNinja["CMake + Ninja"]
         CMakeNinja -->|"Bundle Native Library"| OutputLib["ech_http.dll / .so / .dylib"]
     end
@@ -73,9 +73,13 @@ prompt cleanup.
 | **macOS** | `x64`, `arm64` | macOS host, Xcode Command Line Tools, CMake, Ninja | macOS 10.15+ (x64) / 11.0+ (arm64) |
 | **iOS** | `arm64` (device), `arm64`/`x64` (simulator) | macOS host, Xcode, CMake, Ninja | iOS 13.0+ |
 | **Android** | `arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86` | Android NDK r28.2+ (or Flutter bundled NDK), CMake, Ninja | Android API level 21+ (5.0 Lollipop) |
+| **OpenHarmony / HarmonyOS** | `arm64`, `x64` | OHOS native SDK, CMake, Ninja; Flutter-OH with Native Assets support | API 26 (verified) |
+
+For OHOS HAP builds, the hook locates the native SDK from the compiler path.
+Set `OHOS_NDK_HOME` to the native SDK directory if needed.
 
 > [!NOTE]
-> Web (Browsers) and native HarmonyOS are not currently supported. Android binaries link against static libc++ and use 16 KiB ELF segment alignment for Android 15 compatibility.
+> Web (Browsers) is not currently supported. Android binaries link against static libc++ and use 16 KiB ELF segment alignment for Android 15 compatibility.
 
 ---
 

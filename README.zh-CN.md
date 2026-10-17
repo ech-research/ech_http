@@ -2,7 +2,7 @@
 
 [![Dart SDK](https://img.shields.io/badge/Dart-3.10+-0175C2.svg?logo=dart)](https://dart.dev)
 [![Flutter](https://img.shields.io/badge/Flutter-3.38+-02569B.svg?logo=flutter)](https://flutter.dev)
-[![Platforms](https://img.shields.io/badge/平台支持-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Linux%20%7C%20Windows-blue.svg)](#支持平台与工具链)
+[![Platforms](https://img.shields.io/badge/平台支持-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20OHOS-blue.svg)](#支持平台与工具链)
 [![License: MIT](https://img.shields.io/badge/开源协议-MIT-yellow.svg)](LICENSE)
 [![ECH Standard](https://img.shields.io/badge/TLS%201.3-ECH%20(RFC%20Draft)-green.svg)](https://datatracker.ietf.org/doc/draft-ietf-tls-esni/)
 
@@ -34,7 +34,7 @@ flowchart TD
 
     subgraph BuildSystem["Dart Build Hook (构建期)"]
         Hook["hook/build.dart 构建钩子"] -->|"校验 SHA-256 摘要"| SDKCache["预编译 SDK 本地缓存\n(.dart_tool 或 user_defines)"]
-        SDKCache -->|"仅下载当前构建目标"| PrebuiltRepo["GitHub Releases\n(Windows / Linux / Apple / Android)"]
+        SDKCache -->|"仅下载当前构建目标"| PrebuiltRepo["GitHub Releases\n(Windows / Linux / Apple / Android / OHOS)"]
         Hook -->|"仅就地编译 C++ 桥接代码"| CMakeNinja["CMake + Ninja"]
         CMakeNinja -->|"打包原生动态库"| OutputLib["ech_http.dll / .so / .dylib"]
     end
@@ -70,9 +70,13 @@ flowchart TD
 | **macOS** | `x64`, `arm64` | macOS 系统, Xcode Command Line Tools, CMake, Ninja | macOS 10.15+ (x64) / 11.0+ (arm64) |
 | **iOS** | `arm64` (真机), `arm64`/`x64` (模拟器) | macOS 系统, Xcode, CMake, Ninja | iOS 13.0+ |
 | **Android** | `arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86` | Android NDK r28.2+ (或 Flutter 自带 NDK), CMake, Ninja | Android API Level 21+ (5.0 Lollipop) |
+| **OpenHarmony / HarmonyOS** | `arm64`, `x64` | OHOS native SDK、CMake、Ninja；支持 Native Assets 的 Flutter-OH | API 26（已验证） |
+
+构建 OHOS HAP 时，钩子从编译器路径定位 native SDK；需要时可通过
+`OHOS_NDK_HOME` 指定 native SDK 目录。
 
 > [!NOTE]
-> 当前暂不支持浏览器 Web 环境及原生鸿蒙（HarmonyOS）。Android 原生库使用静态 libc++ 链接，并满足 Android 15 强制要求的 16 KiB ELF 页面对齐。
+> 当前暂不支持浏览器 Web 环境。Android 原生库使用静态 libc++ 链接，并满足 Android 15 强制要求的 16 KiB ELF 页面对齐。
 
 ---
 

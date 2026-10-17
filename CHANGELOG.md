@@ -6,6 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+- OpenHarmony / HarmonyOS arm64 and x64 support through Flutter-OH Native Assets
+  and precompiled dependency SDKs.
+
+### Changed
+- Allow compatible `code_assets` and `hooks` versions for Flutter-OH's `meta` pin.
+
+### Fixed
+- Reset bridge CMake metadata when the package moves between checkouts or caches.
+
+---
+
 ## [0.2.1] - 2026-09-29
 
 ### Changed
