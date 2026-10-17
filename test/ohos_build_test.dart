@@ -58,19 +58,16 @@ void main() {
     expect(config.abi, 'x86_64');
   });
 
-  test(
-    'supports explicit source-build configuration with a native SDK path',
-    () {
-      final config = OhosBuildConfig.detect(
-        targetOS: OS.linux,
-        architecture: Architecture.arm64,
-        explicitlyOhos: true,
-        sdkPath: native.path,
-        environment: {},
-      )!;
-      expect(config.nativeSdk, native.path);
-    },
-  );
+  test('supports an explicit OHOS configuration with a native SDK path', () {
+    final config = OhosBuildConfig.detect(
+      targetOS: OS.linux,
+      architecture: Architecture.arm64,
+      explicitlyOhos: true,
+      sdkPath: native.path,
+      environment: {},
+    )!;
+    expect(config.nativeSdk, native.path);
+  });
 
   test('missing SDK fails with actionable configuration guidance', () {
     expect(
@@ -89,16 +86,19 @@ void main() {
     );
   });
 
-  test('unsupported OHOS architecture fails before compiling dependencies', () {
-    expect(
-      () => OhosBuildConfig.detect(
-        targetOS: OS.fromString('ohos'),
-        architecture: Architecture.arm,
-        sdkPath: native.path,
-      ),
-      throwsUnsupportedError,
-    );
-  });
+  test(
+    'unsupported OHOS architecture fails before downloading dependencies',
+    () {
+      expect(
+        () => OhosBuildConfig.detect(
+          targetOS: OS.fromString('ohos'),
+          architecture: Architecture.arm,
+          sdkPath: native.path,
+        ),
+        throwsUnsupportedError,
+      );
+    },
+  );
 
   test('explicit OHOS override cannot mislabel a macOS asset', () {
     expect(

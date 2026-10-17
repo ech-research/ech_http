@@ -42,14 +42,14 @@ We distinguish between three tiers of verification:
 | **Android** | `arm64-v8a` | **Tier 1** | Physical device run (API 35), live ECH handshake, authenticated retry, connection reuse | Non-standard custom Android ROMs |
 | **Android** | `armeabi-v7a`, `x86_64` | **Tier 2** | Flutter Debug APK packaging for both ABIs | Runtime execution on physical 32-bit ARM / x86_64 devices |
 | **Android** | `x86` | **Tier 2** | NDK bridge build and link check in CI | 32-bit x86 Android runtime execution |
-| **OpenHarmony / HarmonyOS** | arm64, x64 | **Tier 2** | Both architectures cross-compile through the build hook; a signed arm64 Flutter Debug HAP returns HTTP 200 with ECH accepted on MatePad mini | See the [OHOS guide](ohos.md) for runtime scope; full suite not repeated on OHOS, no x64 device attached |
+| **OpenHarmony / HarmonyOS** | arm64, x64 | **Tier 2** | arm64/x64 precompiled SDKs and bridge builds; an earlier source-build signed Debug HAP returned HTTP 200 with accepted ECH on MatePad mini | See the [OHOS guide](ohos.md) for runtime scope; precompiled SDK device rerun pending; full suite not repeated on OHOS, no x64 device attached |
 | **Web** | All | **Tier 3** | Not supported by this native C++ FFI architecture | N/A |
 
 ---
 
 ## 2. Precompiled SDK Release Registry
 
-Precompiled dependency SDKs (statically built libcurl 8.22.0 + BoringSSL + zlib 1.3.2) are hosted in four dedicated public repositories:
+Precompiled dependency SDKs (statically built libcurl 8.22.0 + BoringSSL + zlib 1.3.2) are hosted in five dedicated public repositories:
 
 | Build Repository | Release Tag | Target Platforms & Architectures |
 | :--- | :--- | :--- |
@@ -57,6 +57,7 @@ Precompiled dependency SDKs (statically built libcurl 8.22.0 + BoringSSL + zlib 
 | [libechhttp-darwin-build](https://github.com/ech-research/libechhttp-darwin-build) | `v0.1.2` | macOS / iOS: `x64`, `arm64` (Device + Simulator) |
 | [libechhttp-android-build](https://github.com/ech-research/libechhttp-android-build) | `v0.1.1` | Android: `arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86` |
 | [libechhttp-linux-build](https://github.com/ech-research/libechhttp-linux-build) | `v0.1.1` | Linux: `x64`, `arm64` |
+| [libechhttp_ohos_build](https://github.com/tignioj/libechhttp_ohos_build) | `v0.1.0` | OpenHarmony / HarmonyOS: `arm64`, `x64` (SDK API 26) |
 
 All release archives and their SHA-256 digests are pinned in [lib/src/build_support/dependencies.json](../lib/src/build_support/dependencies.json).
 

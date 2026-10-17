@@ -10,7 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - OpenHarmony / HarmonyOS arm64 and x64 builds through Flutter-OH Native Assets,
-  using pinned BoringSSL, curl, and zlib sources with verified downloads.
+  using versioned BoringSSL, curl, and zlib dependency SDKs pinned by SHA-256.
+  Consumers compile only the C++ bridge; dependency builds live in the
+  independent `libechhttp_ohos_build` repository.
 - OHOS SDK detection, cross-compilation and Flutter HAP smoke checks in CI,
   and English and Chinese setup and verification guides.
 
@@ -19,8 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pin `meta` 1.17.0.
 
 ### Fixed
-- Invalidate OHOS CMake outputs when dependency pins, source paths, compiler
-  options, or the native SDK change, while retaining downloaded sources.
+- Use the shared, content-addressed prebuilt cache for OHOS, including archive
+  and per-file integrity checks, offline reuse, and repair of modified files.
 - Reset bridge CMake metadata when the package moves between checkouts or caches.
 - Use the original Dart SDK for CI package tools after adding Flutter-OH to PATH,
   avoiding reuse of an incompatible hook kernel across Dart SDK versions.

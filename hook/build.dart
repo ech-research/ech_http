@@ -71,43 +71,16 @@ Future<void> main(List<String> args) async {
             iosSdk: code.targetOS == OS.iOS ? code.iOS.targetSdk : null,
           )
         : 'ohos-${code.targetArchitecture.name}';
-    final String sdk;
-    if (ohos == null) {
-      final dependency = PrebuiltDependency.fromManifest(manifest, target);
-      sdk = await preparePrebuilt(dependency, cache);
-    } else {
-      final python =
-          _onPath('python3', Platform.environment) ??
-          _onPath('python', Platform.environment);
-      if (python == null) {
-        throw StateError('OHOS source builds require Python >=3.12');
-      }
-      final builder = p.join(root, 'tool', 'build_ohos.py');
+    if (ohos != null) {
       output.dependencies.addAll([
-        Uri.file(builder),
-        Uri.file(p.join(root, 'tool', 'ohos', 'CMakeLists.txt')),
-        Uri.file(p.join(root, 'tool', 'ohos', 'EchHttpDeps.cmake')),
         Uri.file(p.join(ohos.nativeSdk, 'oh-uni-package.json')),
+        Uri.file(
+          p.join(ohos.nativeSdk, 'build', 'cmake', 'ohos.toolchain.cmake'),
+        ),
       ]);
-      final dependencyBuild = p.join(shared, target);
-      stderr.writeln(
-        'ech_http: building pinned OHOS dependencies (cached after the first build)',
-      );
-      await runner.run(python, [
-        builder,
-        '--deps-only',
-        '--native-sdk',
-        ohos.nativeSdk,
-        '--arch',
-        code.targetArchitecture.name,
-        '--output',
-        dependencyBuild,
-        '--source-cache',
-        input.userDefines.path('source_cache')?.toFilePath() ??
-            p.join(dependencyBuild, 'sources'),
-      ]);
-      sdk = p.join(dependencyBuild, 'sdk');
     }
+    final dependency = PrebuiltDependency.fromManifest(manifest, target);
+    final sdk = await preparePrebuilt(dependency, cache);
 
     final tools = await _toolchain(code, runner, ohos: ohos);
     runner.environment = tools.environment;
@@ -132,7 +105,9 @@ Future<void> main(List<String> args) async {
     }
     final nativeBuild = p.join(out, 'native');
     await prepareCmakeDirectory(p.join(root, 'src'), nativeBuild);
-    stderr.writeln('ech_http: compiling C++ bridge with $target dependencies');
+    stderr.writeln(
+      'ech_http: compiling C++ bridge with prebuilt $target dependencies',
+    );
     await runner.run(tools.cmake, [
       '-S',
       p.join(root, 'src'),

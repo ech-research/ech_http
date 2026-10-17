@@ -8,8 +8,9 @@
 
 ## 构建要求
 
-- Dart >=3.10、Python >=3.12、Git、CMake >=3.22、Ninja、Go（编译 BoringSSL 所需）。
-- OpenHarmony native SDK，包含 `build/cmake/ohos.toolchain.cmake`。
+- Dart >=3.10、CMake >=3.22、Ninja；依赖库已预编译，无需为 `ech_http` 安装 Python 或 Go。
+- OpenHarmony / HarmonyOS native SDK，包含 `build/cmake/ohos.toolchain.cmake`。
+  预编译 SDK 使用 26.0.0.105 / API 26；当前消费方也在该版本验证，低 API 兼容性未验证。
   可将 `OHOS_NDK_HOME` 指向 `native` 本身或其父目录；也支持 HarmonyOS
   命令行工具的 `HOS_SDK_HOME/default/openharmony/native` 布局。
 - 应用构建需要已支持 OHOS Native Assets 的 Flutter-OH。
@@ -47,51 +48,43 @@ hooks:
     ech_http:
       target: ohos
       ohos_sdk: /absolute/path/to/openharmony/native
-      # 可选：跨构建复用已下载的固定版本源码。
-      source_cache: /absolute/path/to/ech-http-sources
+      # 可选：跨构建复用经过校验的预编译 SDK。
+      binary_cache: /absolute/path/to/ech-http-sdks
 ```
 
-首次构建会从包内 `dependencies.json` 指定的版本下载和编译 BoringSSL、
-curl、zlib。curl/zlib 校验 SHA-256，BoringSSL 校验 Git 提交。
-随后 Ninja 增量复用编译结果。无需另外创建或发布预编译依赖仓库。
-OHOS 使用静态 C++ 运行库，并隐藏其符号；HAP 不必额外打包
+首次构建下载 `lib/src/build_support/dependencies.json` 固定版本与 SHA-256 的
+预编译依赖 SDK，校验元数据及逐文件摘要后，本地仅编译 `src/ech_http.cpp`
+胶水代码。消费方不再下载、编译 BoringSSL、curl、zlib 源码。
+后续构建复用已校验的 SDK 缓存；下载与缓存修复机制和其他平台一致。
+
+预编译 SDK 由独立仓库
+[libechhttp_ohos_build](https://github.com/tignioj/libechhttp_ohos_build) 构建和发布，
+首版为 [v0.1.0](https://github.com/tignioj/libechhttp_ohos_build/releases/tag/v0.1.0)。
+包含匹配头文件、四个静态库、CMake 配置、许可证和构建来源元数据。
+维护者更新 SDK 时运行 `python3 tool/update_prebuilt.py ohos=v0.1.0`；
+该 Python 工具不会由应用构建钩子调用。
+
+OHOS 使用静态 C++ 运行库，并隐藏静态依赖符号。HAP 不必额外打包
 `libc++_shared.so`，也不会把 TLS 库的符号暴露给其他播放器插件。
 
 ## 独立编译与检查
 
-不必先创建 Flutter 应用即可检查交叉编译和 Native Assets 输出：
+不必先创建 Flutter 应用即可检查 SDK 下载、胶水代码交叉编译和 Native Assets 输出：
 
 ```sh
 export OHOS_NDK_HOME=/absolute/path/to/openharmony/native
 dart pub get
 dart run tool/check_native_build.dart ohos arm64
+dart run tool/check_native_build.dart ohos x64
 ```
 
-该检查使用与 Flutter-OH 一致的 Linux 兼容输入和 OHOS 编译器。
-清单位于 `.dart_tool/verify/ohos-arm64-device/output.json`，包含
+该检查使用与 Flutter-OH 一致的 Linux 兼容输入和 OHOS 编译器，下载对应架构的
+预编译 SDK。清单位于 `.dart_tool/verify/ohos-arm64-device/output.json`
+或 `.dart_tool/verify/ohos-x64-device/output.json`，包含
 `package:ech_http/ech_http_bindings` 对应的鸿蒙 `.so`。
 
-也可单独生成库与原生请求测试程序：
-
-```sh
-python3 tool/build_ohos.py \
-  --native-sdk "$OHOS_NDK_HOME" \
-  --dart-sdk /absolute/path/to/dart-sdk \
-  --arch arm64
-```
-
-产物位于 `build/ohos/arm64/bridge/out/`。`--arch x64` 使用独立的
-`build/ohos/x64/` 目录。已有 Flutter-OH 的构建会自动运行相同的依赖编译步骤。
-
-原生测试程序参数与现有工具一致：
-
-```sh
-./ech_http_smoke URL HTTP代理或空字符串 ECHConfigList或空字符串 目标IP或空字符串
-```
-
-ECH 配置非空时，测试要求响应为 HTTP 200 且报告 ECH 被服务器接受。
-HarmonyOS 商用设备可能拒绝直接执行未签名 ELF；这种情况下应使用官方
-调试签名，或将库放入正常签名的测试 HAP。普通文件执行权限并不能替代代码签名。
+维护者如需重建大型依赖，应在独立 SDK 仓库执行构建与发布流程；
+应用项目和本包内不再提供源码依赖编译入口。
 
 ## Flutter 真机测试包
 
@@ -116,7 +109,7 @@ Debug 测试包不依赖这个 AOT 编译器。
 
 ## 验证范围
 
-2026-10-17 本地检查使用 macOS arm64 构建机、Dart 3.13.5、OpenHarmony
+2026-10-17 初始源码构建版本的本地检查使用 macOS arm64 构建机、Dart 3.13.5、OpenHarmony
 native SDK 6.0.0.47（API 20）。Flutter HAP 使用 Flutter-OH
 3.41.9+ohos-1.0.2、其内置 Dart 3.11.5 和 HarmonyOS SDK 26.0.0.105。
 连接的 MatePad mini 为 HarmonyOS API 26。
@@ -133,10 +126,10 @@ native SDK 6.0.0.47（API 20）。Flutter HAP 使用 Flutter-OH
 | Debug HAP 构建及库打包 | 通过，包内包含 arm64 `libech_http.so` 与 Native Assets 映射 |
 | 本机 Release HAP 构建 | 原生库与 Dart 编译通过；AOT 编译器需要本机尚未安装的 Rosetta |
 | MatePad mini 上执行裸 ELF | 系统返回 `Permission denied`，未执行到请求代码 |
-| 已签名 Flutter Debug HAP 真机运行 | 通过，Native Assets 中的 arm64 库正常加载并解析 FFI 符号 |
-| MatePad mini HTTPS / ECH 请求 | 通过，DoH 获取 ECH 配置后返回 HTTP 200、`ECH accepted: true`，服务端返回 `sni=encrypted`、`tls=TLSv1.3` |
+| 初始源码构建版本的签名 Debug HAP 真机运行 | 通过，Native Assets 中的 arm64 库正常加载并解析 FFI 符号 |
+| 初始源码构建版本的 MatePad mini HTTPS / ECH 请求 | 通过，DoH 获取 ECH 配置后返回 HTTP 200、`ECH accepted: true`，服务端返回 `sni=encrypted`、`tls=TLSv1.3` |
 
-真机日志中的关键结果如下（来自正常签名安装的 Flutter HAP）：
+此前源码构建版本的真机日志如下（来自正常签名安装的 Flutter HAP）：
 
 ```text
 ECH_HTTP_SMOKE: libcurl/8.22.0 BoringSSL zlib/1.3.2
@@ -150,29 +143,37 @@ sni=encrypted
 Native Assets 集成和公网 HTTPS/ECH；gzip、代理、取消请求、isolate 退出
 等行为已覆盖桌面回归测试，尚未在鸿蒙真机上逐项复测。
 x64 仅完成交叉编译和构建钩子检查。初次本地真机验证未包含 Release HAP
-与远程 CI；远程检查覆盖范围见下文。
+与远程 CI。改为预编译 SDK 后，应以本次 SDK CI 与消费方 CI 为准；
+此前真机记录不等同于已在设备上复测预编译 SDK 版本。
+
+预编译依赖仓库的[首版 CI](https://github.com/tignioj/libechhttp_ohos_build/actions/runs/39006660450)
+已验证 arm64、x64 的依赖与独立消费方链接、ELF 架构、动态依赖、归档摘要、
+逐文件摘要及来源提交。该 CI 不执行目标设备代码。
+
+同日 macOS arm64 本地的一次检查中，从空的 SDK 缓存下载该 Release 并构建胶水代码，
+arm64 耗时 6.7 秒、x64 耗时 7.0 秒。该观察包含下载和构建，受网络与构建机影响，
+不代表所有环境的固定耗时。
 
 ## 缓存与工具链切换
 
-构建目录按架构区分。源码构建脚本为每个依赖和独立编译的桥接层记录源码绝对路径、
-配置参数、BoringSSL/curl/zlib 版本与摘要、SDK 元数据及 toolchain 摘要。
-这些输入不变时复用 Ninja 增量产物；输入改变时清理对应的生成目录，
-重新运行配置探测和编译，避免依赖升级后出现源码目录冲突或使用旧探测结果。
-迁移没有配置记录的旧构建目录时也会重新生成。
-已下载的源码独立保存，不受 CMake 构建目录清理影响。
-构建钩子的桥接层也会在包源码路径变更时重置 CMake 元数据。
+OHOS 和其他平台共用 `preparePrebuilt`：以目标架构和归档 SHA-256 区分缓存，
+核验 ZIP、SDK 元数据及逐文件摘要；解压文件损坏时从已校验的归档修复。
+更换版本或归档摘要后自动使用新的缓存目录，不会把旧依赖产物混入新 SDK。
+`binary_cache` 路径相对于消费方 `pubspec.yaml`。缓存完整时可离线构建。
+构建钩子的胶水代码会在包源码路径变更时重置 CMake 元数据。
 
 切换标准 Dart 与 Flutter-OH 内置 Dart 时，应重新生成应用的 `.dart_tool`
 并运行 `flutter pub get`，避免旧 SDK 编译的 `hook.dill` 导致
 `Invalid kernel binary format version`。CI 中包级检查始终使用原 Dart SDK，
 Flutter-OH 测试应用使用自身独立的 `.dart_tool` 和内置 Dart。
 
-运行无需网络或 OHOS SDK 的缓存回归检查：
-
 ```sh
-python3 tool/test_build_ohos.py
+dart test test/ohos_build_test.dart test/prebuilt_test.dart
 ```
 
-CI 的 OHOS 作业检查 SDK 识别、缓存失效、arm64/x64 构建钩子输出，
-以及固定 Flutter-OH 工具链的未签名 Release HAP 打包。远程构建不能
-替代签名 HAP 的真机运行检查。
+独立 SDK CI 验证两个架构的大型依赖编译、链接、ELF 和归档完整性；
+本包 CI 从已发布 Release 下载 SDK，仅编译胶水代码，并检查 arm64/x64
+构建钩子输出及固定 Flutter-OH 工具链的未签名 Release HAP 打包和映射。
+两类 CI 都不替代签名 HAP 的真机运行。x64 尚未进行真机验证；代理、gzip、
+取消请求和 isolate 退出尚未在鸿蒙真机逐项复测。预编译 SDK 版本的设备复测
+不包含在本次自动化构建验证中。

@@ -21,14 +21,16 @@ List<int> _sdk({
   String zlibVersion = '1.3.2',
   String zlibDigest = _zlibDigest,
 }) {
+  final windows = target.startsWith('windows-');
+  String library(String name) => windows ? '$name.lib' : 'lib$name.a';
   final files = <String, String>{
     'cmake/EchHttpDeps.cmake': 'verified cmake',
     'include/curl/curl.h': 'curl header',
     'include/openssl/ssl.h': 'ssl header',
-    'lib/curl.lib': 'curl static library',
-    'lib/ssl.lib': 'ssl static library',
-    if (!omitCrypto) 'lib/crypto.lib': 'crypto static library',
-    if (!omitZlib) 'lib/zlib.lib': 'zlib static library',
+    'lib/${library('curl')}': 'curl static library',
+    'lib/${library('ssl')}': 'ssl static library',
+    if (!omitCrypto) 'lib/${library('crypto')}': 'crypto static library',
+    if (!omitZlib) 'lib/${library('zlib')}': 'zlib static library',
     'include/zlib.h': 'zlib header',
     'include/zconf.h': 'zlib configuration',
     'licenses/ZLIB_LICENSE': 'zlib license',
@@ -57,16 +59,17 @@ List<int> _sdk({
   return ZipEncoder().encode(archive);
 }
 
-PrebuiltDependency _pin(List<int> bytes) => PrebuiltDependency(
-  target: 'windows-x64',
-  release: 'v0.1.0',
-  url: Uri.https('example.test', '/dependency.zip'),
-  digest: sha256.convert(bytes).toString(),
-  curlVersion: '8.22.0',
-  boringRevision: _revision,
-  zlibVersion: '1.3.2',
-  zlibDigest: _zlibDigest,
-);
+PrebuiltDependency _pin(List<int> bytes, {String target = 'windows-x64'}) =>
+    PrebuiltDependency(
+      target: target,
+      release: 'v0.1.0',
+      url: Uri.https('example.test', '/dependency.zip'),
+      digest: sha256.convert(bytes).toString(),
+      curlVersion: '8.22.0',
+      boringRevision: _revision,
+      zlibVersion: '1.3.2',
+      zlibDigest: _zlibDigest,
+    );
 
 void main() {
   late Directory cache;
@@ -114,6 +117,42 @@ void main() {
       );
     },
   );
+
+  for (final target in ['ohos-arm64', 'ohos-x64']) {
+    test('$target SDK is verified, cached offline and repaired', () async {
+      final bytes = _sdk(target: target);
+      final pin = _pin(bytes, target: target);
+      final sdk = await preparePrebuilt(
+        pin,
+        cache.path,
+        download: (_, file) => file.writeAsBytes(bytes),
+      );
+      final library = File(p.join(sdk, 'lib', 'libcurl.a'));
+      expect(await library.readAsString(), 'curl static library');
+      await library.writeAsString('tampered');
+      expect(
+        await preparePrebuilt(
+          pin,
+          cache.path,
+          download: (_, _) => throw StateError('Cached SDK must work offline'),
+        ),
+        sdk,
+      );
+      expect(await library.readAsString(), 'curl static library');
+    });
+  }
+
+  test('OHOS SDK cannot be used for the other architecture', () async {
+    final bytes = _sdk(target: 'ohos-x64');
+    await expectLater(
+      preparePrebuilt(
+        _pin(bytes, target: 'ohos-arm64'),
+        cache.path,
+        download: (_, file) => file.writeAsBytes(bytes),
+      ),
+      throwsStateError,
+    );
+  });
 
   test(
     'corrupt cached archive is replaced only by a matching download',

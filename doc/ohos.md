@@ -9,8 +9,11 @@ verification scope below for the checks performed on each architecture.
 
 ## Requirements
 
-- Dart >=3.10, Python >=3.12, Git, CMake >=3.22, Ninja, and Go (for BoringSSL).
-- An OpenHarmony native SDK containing `build/cmake/ohos.toolchain.cmake`.
+- Dart >=3.10, CMake >=3.22, and Ninja. `ech_http` consumers do not need Python
+  or Go to build the precompiled dependencies.
+- An OpenHarmony / HarmonyOS native SDK containing `build/cmake/ohos.toolchain.cmake`.
+  The precompiled SDK and verified consumer use version 26.0.0.105 / API 26;
+  compatibility with lower API levels has not been verified.
   `OHOS_NDK_HOME` may point to the native directory or its parent.
   The HarmonyOS command-line tools layout
   `HOS_SDK_HOME/default/openharmony/native` is also supported.
@@ -52,57 +55,49 @@ hooks:
     ech_http:
       target: ohos
       ohos_sdk: /absolute/path/to/openharmony/native
-      # Optional: share downloaded pinned sources between builds.
-      source_cache: /absolute/path/to/ech-http-sources
+      # Optional: share verified precompiled SDKs between builds.
+      binary_cache: /absolute/path/to/ech-http-sdks
 ```
 
-The first build downloads and compiles the BoringSSL, curl, and zlib versions
-pinned in `lib/src/build_support/dependencies.json`. curl and zlib archives
-are checked against SHA-256 digests; BoringSSL is checked against its Git
-revision. Later builds reuse Ninja outputs incrementally. No additional
-prebuilt dependency repository is required.
+The first build downloads the precompiled SDK pinned by version and SHA-256
+in `lib/src/build_support/dependencies.json`. After validating metadata and
+per-file hashes, the hook compiles only `src/ech_http.cpp`. Consumers no longer
+download or compile BoringSSL, curl, or zlib sources. Later builds reuse the
+verified SDK cache, with the same integrity and repair checks as other platforms.
 
-OHOS links the C++ runtime statically and hides static library symbols. The
-HAP does not need an extra `libc++_shared.so`, and the TLS library's symbols
-are not exported to other native plugins.
+The independent [libechhttp_ohos_build](https://github.com/tignioj/libechhttp_ohos_build)
+repository builds and publishes these SDKs, starting with
+[v0.1.0](https://github.com/tignioj/libechhttp_ohos_build/releases/tag/v0.1.0).
+Each archive includes matching headers, four static libraries, CMake targets,
+licenses, per-file hashes, and build provenance. Maintainers update reviewed
+pins with `python3 tool/update_prebuilt.py ohos=v0.1.0`; application hooks never
+invoke that Python tool.
+
+OHOS links the C++ runtime statically and hides static library symbols. The HAP
+does not need an extra `libc++_shared.so`, and TLS symbols are not exported to
+other native plugins.
 
 ## Standalone builds
 
-Check cross-compilation and Native Assets output without creating an app:
+Check SDK download, bridge cross-compilation, and Native Assets output without
+creating an application:
 
 ```sh
 export OHOS_NDK_HOME=/absolute/path/to/openharmony/native
 dart pub get
 dart run tool/check_native_build.dart ohos arm64
+dart run tool/check_native_build.dart ohos x64
 ```
 
-The check uses Flutter-OH's Linux compatibility input and OHOS compiler.
-The manifest at `.dart_tool/verify/ohos-arm64-device/output.json` identifies
-the OHOS library as `package:ech_http/ech_http_bindings`.
-Repeat with `ohos x64` to verify the other supported architecture.
+The checks use Flutter-OH's Linux compatibility input and OHOS compiler, and
+download the corresponding precompiled SDK. Manifests are written to
+`.dart_tool/verify/ohos-arm64-device/output.json` and
+`.dart_tool/verify/ohos-x64-device/output.json`, with the library identified as
+`package:ech_http/ech_http_bindings`.
 
-To build the library and native request smoke executable directly:
-
-```sh
-python3 tool/build_ohos.py \
-  --native-sdk "$OHOS_NDK_HOME" \
-  --dart-sdk /absolute/path/to/dart-sdk \
-  --arch arm64
-```
-
-Outputs are in `build/ohos/arm64/bridge/out/`. `--arch x64` uses
-`build/ohos/x64/`. Flutter-OH builds run the same dependency build steps.
-
-The native smoke executable accepts four arguments:
-
-```sh
-./ech_http_smoke URL HTTP_PROXY_OR_EMPTY ECH_CONFIG_LIST_OR_EMPTY TARGET_IP_OR_EMPTY
-```
-
-With a nonempty ECH configuration, success requires HTTP 200 and accepted ECH.
-Commercial HarmonyOS devices may reject unsigned ELF executables. Use an
-official debug signature or a normally signed test HAP; executable file
-permissions do not replace code signing.
+Maintainers rebuilding dependencies use the independent SDK repository's build
+and publication workflow. Neither this package nor consumers contain an entry
+point to compile those dependency sources.
 
 ## Flutter device smoke app
 
@@ -127,7 +122,7 @@ builds do not use that AOT compiler.
 
 ## Verification scope
 
-Local verification on 2026-10-17 used a macOS arm64 host, Dart 3.13.5,
+The initial source-build verification on 2026-10-17 used a macOS arm64 host, Dart 3.13.5,
 and OpenHarmony native SDK 6.0.0.47 (API 20). The Flutter HAP used
 Flutter-OH 3.41.9+ohos-1.0.2, its bundled Dart 3.11.5, and HarmonyOS SDK
 26.0.0.105. The connected MatePad mini runs HarmonyOS API 26.
@@ -144,10 +139,10 @@ Flutter-OH 3.41.9+ohos-1.0.2, its bundled Dart 3.11.5, and HarmonyOS SDK
 | Debug HAP packaging | Passed with arm64 `libech_http.so` and Native Assets mapping |
 | Local Release HAP build | Native library and Dart compilation passed; AOT requires Rosetta, absent on the verified host |
 | Bare ELF execution on MatePad mini | Rejected with `Permission denied` before request code ran |
-| Signed Debug HAP on MatePad mini | Native library loaded and FFI symbols resolved |
-| Device HTTPS / ECH request | HTTP 200, accepted ECH, `sni=encrypted`, and `tls=TLSv1.3` |
+| Initial source-build signed Debug HAP on MatePad mini | Native library loaded and FFI symbols resolved |
+| Initial source-build device HTTPS / ECH request | HTTP 200, accepted ECH, `sni=encrypted`, and `tls=TLSv1.3` |
 
-The signed HAP's device log contains:
+The earlier source-build signed HAP's device log contains:
 
 ```text
 ECH_HTTP_SMOKE: libcurl/8.22.0 BoringSSL zlib/1.3.2
@@ -162,18 +157,27 @@ file, not part of the package). Device verification covers Native Assets
 integration and public HTTPS/ECH. gzip, proxies, cancellation, and isolate
 shutdown have desktop regression coverage but have not each been repeated
 on an OHOS device. x64 has build coverage only. Release HAP and remote CI
-verification were not part of the initial local device run.
+verification were not part of the initial local device run. Those historical
+device results do not mean the precompiled SDK version has been rerun on a device.
+
+The dependency repository's [initial SDK CI](https://github.com/tignioj/libechhttp_ohos_build/actions/runs/39006660450)
+verified arm64/x64 dependency and packaged consumer links, ELF architecture,
+dynamic dependencies, archive and file digests, and source provenance.
+It does not execute target device code.
+
+One local macOS arm64 check on the same date downloaded this Release into an
+empty SDK cache and built the bridge in 6.7 seconds for arm64 and 7.0 seconds
+for x64. These observations include downloading and building, depend on the
+network and build host, and are not a timing guarantee for other environments.
 
 ## Caching and Dart SDK changes
 
-Build directories are separate for each architecture. The source builder
-records each dependency and standalone bridge configuration's source path, configure
-arguments, dependency pins, native SDK metadata, and toolchain digest.
-Unchanged inputs preserve incremental outputs. Changed inputs discard the
-generated directory and repeat configuration probes and compilation. This
-also migrates older build directories without a configuration record.
-Downloaded sources are stored separately and survive this invalidation.
-The build hook also resets bridge CMake metadata when the package source moves.
+OHOS shares `preparePrebuilt` with the other platforms. The target and archive
+SHA-256 identify the cache directory. ZIP digests, SDK metadata, and per-file
+hashes are checked; modified extracted files are repaired from the verified
+archive. New archive pins use a new cache directory. `binary_cache` paths are
+relative to the consuming `pubspec.yaml`; a complete cache works offline.
+The hook resets bridge CMake metadata when the package source moves.
 
 When switching between standard Dart and Flutter-OH's bundled Dart,
 regenerate the application's `.dart_tool` and run `flutter pub get`.
@@ -181,12 +185,15 @@ Otherwise a cached `hook.dill` may produce
 `Invalid kernel binary format version`. CI keeps package tools on their
 original Dart SDK and gives the Flutter-OH consumer its own `.dart_tool`.
 
-Run the cache regression checks without networking or an OHOS SDK:
-
 ```sh
-python3 tool/test_build_ohos.py
+dart test test/ohos_build_test.dart test/prebuilt_test.dart
 ```
 
-The OHOS CI job checks SDK detection, cache invalidation, arm64/x64 hook
-outputs, and an unsigned Release HAP built with the pinned Flutter-OH
-toolchain. Remote packaging checks do not replace signed device execution.
+Independent SDK CI builds and link-checks both architectures, validates ELF
+properties, and verifies complete archives. Package CI downloads published
+SDKs, builds only the bridge, and checks arm64/x64 hook outputs plus unsigned
+Release HAP contents and Native Assets mapping with pinned Flutter-OH.
+Neither pipeline replaces signed device execution. x64 still has no device
+coverage. Proxy, gzip, cancellation, and isolate shutdown have desktop tests
+but have not each been repeated on an OHOS device. Rerunning the precompiled
+SDK version on a device is outside these automated build checks.

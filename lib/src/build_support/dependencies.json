@@ -65,6 +65,16 @@
       "url": "https://github.com/ech-research/libechhttp-darwin-build/releases/download/v0.1.2/libechhttp-deps-v0.1.2-macos-x64.zip",
       "sha256": "f81024344f6542ed33d3c197087ab34f94525f38efc04213508c1eaec44c4a0f"
     },
+    "ohos-arm64": {
+      "release": "v0.1.0",
+      "url": "https://github.com/tignioj/libechhttp_ohos_build/releases/download/v0.1.0/libechhttp-deps-v0.1.0-ohos-arm64.zip",
+      "sha256": "986aaea773733301b66a1f94a1986f71b1a31f54e89c4909fcc2fd4b0ea982fc"
+    },
+    "ohos-x64": {
+      "release": "v0.1.0",
+      "url": "https://github.com/tignioj/libechhttp_ohos_build/releases/download/v0.1.0/libechhttp-deps-v0.1.0-ohos-x64.zip",
+      "sha256": "240eb7c8eb2660302f5e73a2fc28c7a43326874c10522a474034cabcd7953bdc"
+    },
     "windows-arm64": {
       "release": "v0.1.1",
       "url": "https://github.com/ech-research/libechhttp-win32-build/releases/download/v0.1.1/libechhttp-deps-v0.1.1-windows-arm64.zip",
