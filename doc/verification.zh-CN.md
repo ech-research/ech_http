@@ -52,7 +52,7 @@ Flutter Android APK、iOS 未签名 Release 应用、iOS 模拟器 Debug 应用�
 | [libechhttp-darwin-build](https://github.com/ech-research/libechhttp-darwin-build) | `v0.1.2` | macOS / iOS: `x64`, `arm64`（真机 + 模拟器） |
 | [libechhttp-android-build](https://github.com/ech-research/libechhttp-android-build) | `v0.1.1` | Android: `arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86` |
 | [libechhttp-linux-build](https://github.com/ech-research/libechhttp-linux-build) | `v0.1.1` | Linux: `x64`, `arm64` |
-| [libechhttp_ohos_build](https://github.com/tignioj/libechhttp_ohos_build) | `v0.1.0` | OpenHarmony / HarmonyOS: `arm64`, `x64` (SDK API 26) |
+| [libechhttp-ohos-build](https://github.com/ech-research/libechhttp-ohos-build) | `v0.1.0` | OpenHarmony / HarmonyOS: `arm64`, `x64` (SDK API 26) |
 
 每个 SDK 压缩包的 SHA-256 散列均固化在 [lib/src/build_support/dependencies.json](../lib/src/build_support/dependencies.json) 中。
 

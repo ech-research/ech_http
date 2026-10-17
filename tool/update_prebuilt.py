@@ -14,9 +14,6 @@ TARGETS = {
     'ohos': ['ohos-arm64', 'ohos-x64'],
 }
 
-# Update this mapping after an authorized transfer to ech-research.
-REPOSITORIES = {'ohos': 'tignioj/libechhttp_ohos_build'}
-
 
 def main():
     if not sys.argv[1:]:
@@ -28,7 +25,7 @@ def main():
         family, tag = item.split('=', 1)
         if family not in TARGETS or not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+', tag):
             raise SystemExit(f'Invalid family or version: {item}')
-        repo = REPOSITORIES.get(family, f'ech-research/libechhttp-{family}-build')
+        repo = f'ech-research/libechhttp-{family}-build'
         release = json.loads(subprocess.check_output([
             'gh', 'api', f'repos/{repo}/releases/tags/{tag}',
         ], text=True, encoding='utf-8'))
