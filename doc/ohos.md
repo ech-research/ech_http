@@ -122,6 +122,45 @@ builds do not use that AOT compiler.
 
 ## Verification scope
 
+### Precompiled SDK device rerun (2026-10-17)
+
+A signed Debug HAP using the published precompiled SDK was reinstalled and
+launched on MatePad mini (MLR-AL10, API 26). The tested `ech_http` implementation
+was commit `0a94849d7e1efba33abafd3a2529cf8dca4a2268`, with the `v0.1.0` arm64 SDK
+built from `6ebb0d4b4617115f4a2cc7f1b324d861e222c9a2`. The SDK archive SHA-256 was
+`986aaea773733301b66a1f94a1986f71b1a31f54e89c4909fcc2fd4b0ea982fc`.
+
+The app was rebuilt with Flutter-OH 3.41.9+ohos-1.0.2, Dart 3.11.5, and HarmonyOS
+SDK 26.0.0.105 after clearing its `.dart_tool` and Flutter build outputs. Local
+checks verified the downloaded archive digest, precompiled static-library link
+paths, HAP arm64 library, and Native Assets mapping. The packaged library exactly
+matched the newly built bridge after `llvm-strip`; its sole ELF dynamic dependency
+was `libc.so`. The HAP was signed with the existing local debug identity, passed
+signature verification, and was successfully installed over the test app.
+
+At 14:05:48 (Asia/Shanghai), the device returned the unique marker for this run.
+Native Assets loading and FFI calls succeeded, including the backend version.
+After discovering ECH configuration over DoH, the request to
+`https://crypto.cloudflare.com/cdn-cgi/trace` returned:
+
+```text
+ECH_HTTP_PREBUILT_V0_1_0_0a94849: libcurl/8.22.0 BoringSSL zlib/1.3.2
+HTTP 200
+ECH accepted: true
+tls=TLSv1.3
+sni=encrypted
+```
+
+The raw local capture is `build/prebuilt-ohos-runtime-smoke.log`; provenance and
+assertion results are in `build/prebuilt-device-result.json`. These generated
+files are not published with the package. This rerun covers arm64 signed Debug
+HAP loading and live HTTPS/ECH. It does not cover signed Release HAP execution,
+compatibility below API 26, x64 devices, or individual OHOS device regression
+checks for proxies, gzip, cancellation, and isolate shutdown. Desktop coverage
+for these features does not establish OHOS device verification.
+
+### Initial source-build record
+
 The initial source-build verification on 2026-10-17 used a macOS arm64 host, Dart 3.13.5,
 and OpenHarmony native SDK 6.0.0.47 (API 20). The Flutter HAP used
 Flutter-OH 3.41.9+ohos-1.0.2, its bundled Dart 3.11.5, and HarmonyOS SDK
@@ -157,8 +196,8 @@ file, not part of the package). Device verification covers Native Assets
 integration and public HTTPS/ECH. gzip, proxies, cancellation, and isolate
 shutdown have desktop regression coverage but have not each been repeated
 on an OHOS device. x64 has build coverage only. Release HAP and remote CI
-verification were not part of the initial local device run. Those historical
-device results do not mean the precompiled SDK version has been rerun on a device.
+verification were not part of the initial local device run. The separate
+precompiled SDK device rerun is recorded above.
 
 The dependency repository's [initial SDK CI](https://github.com/tignioj/libechhttp_ohos_build/actions/runs/39006660450)
 verified arm64/x64 dependency and packaged consumer links, ELF architecture,
@@ -195,5 +234,5 @@ SDKs, builds only the bridge, and checks arm64/x64 hook outputs plus unsigned
 Release HAP contents and Native Assets mapping with pinned Flutter-OH.
 Neither pipeline replaces signed device execution. x64 still has no device
 coverage. Proxy, gzip, cancellation, and isolate shutdown have desktop tests
-but have not each been repeated on an OHOS device. Rerunning the precompiled
-SDK version on a device is outside these automated build checks.
+but have not each been repeated on an OHOS device. The precompiled SDK device
+rerun above is manual verification, separate from automated CI.

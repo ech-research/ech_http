@@ -109,6 +109,41 @@ Debug 测试包不依赖这个 AOT 编译器。
 
 ## 验证范围
 
+### 预编译 SDK 真机复测（2026-10-17）
+
+在 MatePad mini（MLR-AL10，API 26）上重新安装并启动了使用预编译 SDK 的签名
+Debug HAP。本次测试的 `ech_http` 实现提交为
+`0a94849d7e1efba33abafd3a2529cf8dca4a2268`，依赖使用已发布的 `v0.1.0`
+arm64 SDK（构建提交 `6ebb0d4b4617115f4a2cc7f1b324d861e222c9a2`）。
+SDK 归档 SHA-256 为
+`986aaea773733301b66a1f94a1986f71b1a31f54e89c4909fcc2fd4b0ea982fc`。
+
+使用 Flutter-OH 3.41.9+ohos-1.0.2、Dart 3.11.5 和 HarmonyOS SDK 26.0.0.105，
+清理应用 `.dart_tool` 与 Flutter 构建输出后重新构建。本地确认下载归档摘要、
+预编译静态库链接路径、HAP 中的 arm64 库和 Native Assets 映射；包内库与本次
+胶水代码构建产物经 `llvm-strip` 后完全一致，ELF 动态依赖仅为 `libc.so`。
+HAP 使用已有的本机调试身份签名并通过签名验证，随后成功覆盖安装到设备。
+
+设备于 14:05:48（Asia/Shanghai）返回本次专用日志标记。Native Assets 库加载及
+FFI 调用成功，后端版本正常返回；通过 DoH 获取 ECH 配置后，请求
+`https://crypto.cloudflare.com/cdn-cgi/trace` 返回：
+
+```text
+ECH_HTTP_PREBUILT_V0_1_0_0a94849: libcurl/8.22.0 BoringSSL zlib/1.3.2
+HTTP 200
+ECH accepted: true
+tls=TLSv1.3
+sni=encrypted
+```
+
+原始设备日志保存在本地 `build/prebuilt-ohos-runtime-smoke.log`，产物来源与断言结果
+保存在 `build/prebuilt-device-result.json`；两者均为生成文件，不随包发布。
+本次为 arm64 签名 Debug HAP 的加载和公网 HTTPS/ECH 验证，不包含 Release HAP
+真机运行、低于 API 26 的兼容性、x64 设备，以及代理、gzip、取消请求和 isolate
+退出的逐项鸿蒙真机回归。这些功能的桌面测试覆盖不等同于鸿蒙真机验证。
+
+### 初始源码构建记录
+
 2026-10-17 初始源码构建版本的本地检查使用 macOS arm64 构建机、Dart 3.13.5、OpenHarmony
 native SDK 6.0.0.47（API 20）。Flutter HAP 使用 Flutter-OH
 3.41.9+ohos-1.0.2、其内置 Dart 3.11.5 和 HarmonyOS SDK 26.0.0.105。
@@ -143,8 +178,7 @@ sni=encrypted
 Native Assets 集成和公网 HTTPS/ECH；gzip、代理、取消请求、isolate 退出
 等行为已覆盖桌面回归测试，尚未在鸿蒙真机上逐项复测。
 x64 仅完成交叉编译和构建钩子检查。初次本地真机验证未包含 Release HAP
-与远程 CI。改为预编译 SDK 后，应以本次 SDK CI 与消费方 CI 为准；
-此前真机记录不等同于已在设备上复测预编译 SDK 版本。
+与远程 CI。预编译 SDK 版本的独立真机复测结果见上文。
 
 预编译依赖仓库的[首版 CI](https://github.com/tignioj/libechhttp_ohos_build/actions/runs/39006660450)
 已验证 arm64、x64 的依赖与独立消费方链接、ELF 架构、动态依赖、归档摘要、
@@ -175,5 +209,5 @@ dart test test/ohos_build_test.dart test/prebuilt_test.dart
 本包 CI 从已发布 Release 下载 SDK，仅编译胶水代码，并检查 arm64/x64
 构建钩子输出及固定 Flutter-OH 工具链的未签名 Release HAP 打包和映射。
 两类 CI 都不替代签名 HAP 的真机运行。x64 尚未进行真机验证；代理、gzip、
-取消请求和 isolate 退出尚未在鸿蒙真机逐项复测。预编译 SDK 版本的设备复测
-不包含在本次自动化构建验证中。
+取消请求和 isolate 退出尚未在鸿蒙真机逐项复测。上述预编译 SDK 真机复测
+为手动设备验证，不属于自动化 CI。
