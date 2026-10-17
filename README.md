@@ -91,7 +91,7 @@ Add `ech_http` to your application's `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  ech_http: ^0.2.1
+  ech_http: ^0.2.2
   http: ^1.6.0
 ```
 
