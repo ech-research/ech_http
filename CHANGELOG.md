@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [0.2.3] - 2026-10-22
 
 ### Security
 - Update the bundled Mozilla CA roots to the 2026-10-20 snapshot, which removes
