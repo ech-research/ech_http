@@ -11,7 +11,7 @@ The `ech_http` native library statically links and bundles the following open-so
 | **libcurl** | 8.22.0<br>[Source Archive](https://curl.se/download/curl-8.22.0.tar.xz) | curl License (MIT/X-style) | [`src/CURL_LICENSE`](src/CURL_LICENSE) |
 | **BoringSSL** | Git Commit: [`cff1385e`](https://github.com/google/boringssl/tree/cff1385e77b9b2095558fa625b3c35d589ffe09b) | OpenSSL / ISC / BSD / Apache-2.0 | [`src/BORINGSSL_LICENSE`](src/BORINGSSL_LICENSE) |
 | **zlib** | 1.3.2<br>[Source Archive](https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.gz) | zlib License | [`src/ZLIB_LICENSE`](src/ZLIB_LICENSE) |
-| **Mozilla Root CA Bundle** | Mozilla Snapshot: `2026-08-13`<br>[curl CA Extract](https://curl.se/docs/caextract.html) | Mozilla Public License 2.0 (MPL-2.0) | [`src/CA_BUNDLE_LICENSE`](src/CA_BUNDLE_LICENSE) |
+| **Mozilla Root CA Bundle** | Mozilla Snapshot: `2026-10-20`<br>[curl CA Extract](https://curl.se/docs/caextract.html) | Mozilla Public License 2.0 (MPL-2.0) | [`src/CA_BUNDLE_LICENSE`](src/CA_BUNDLE_LICENSE) |
 | **Android NDK libc++** | Statically linked on Android target ABIs | Apache-2.0 with LLVM Exceptions | [`src/LIBCXX_LICENSE`](src/LIBCXX_LICENSE) |
 
 ---
@@ -22,7 +22,7 @@ The unmodified root certificate bundle is embedded directly within the library s
 - **Location**: `src/cacert.pem`
 - **SHA-256 Digest**:
   ```text
-  f66dff1bdf8f96060b8177976f8b7d9254bc89bc4db933d769f7384d28480bc9
+  796f1389bfea13c0ed78f663b765baaff54a508e5483786bd6ece73c5e3e3cbe
   ```
 - **License Compliance**: In compliance with section 3.2 of MPL-2.0, the source code of the covered CA bundle is distributed unmodified at `src/cacert.pem`.
 
